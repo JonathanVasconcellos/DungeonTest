@@ -1,0 +1,67 @@
+import type { Attribute, Rarity } from '../types';
+
+export const RULES = {
+  dungeonLevels: 10,
+  roomsPerLevel: 10,
+  extraTurnGaugeMax: 100,
+  extraTurnGaugeGainMinPercent: 50,
+  extraTurnGaugeGainMaxPercent: 100,
+  pointsAtLevel: (_level: number) => 1,
+  specializationUnlockLevel: 3,
+  classSkillUnlockLevel: 5,
+  specializationRank2Level: 7,
+  specializationRank3Level: 9,
+  xpToNextLevel: (level: number) => level + 1,
+  xpByRarity: { normal: 1, uncommon: 2, elite: 3 } satisfies Record<Rarity, number>,
+  xpPotionXp: 1,
+  itemDropChance: { normal: 0.1, uncommon: 0.5, elite: 1 } satisfies Record<Rarity, number>,
+  healingPotionFraction: 0.5,
+  inventorySlots: 3,
+  mutationChance: 0.1,
+  mutationBonus: 0.3,
+  enemyWeightVariation: 0.1,
+  criticalMultiplier: 1.5,
+  rogueDexterityDamageMultiplier: 1,
+  fireArrowManaCost: 2,
+  magicShieldManaCost: 1,
+  enemyAbilityBaseChance: 0.1,
+  enemyAbilityMaxChance: 0.4,
+  playerAbilityCancelChance: 0.25,
+  heavyAttackManaCost: 1,
+  doubleAttackManaCost: 1,
+  enemyAbilityManaCost: { normal: 1, uncommon: 1, elite: 1 } satisfies Record<Rarity, number>,
+  fireArrowDamageMultiplier: 1,
+  fireArrowBurnChance: 0.3,
+  burnDamageMultiplier: 0.3,
+  burnDurationTurns: 3,
+  burnContinueChance: 0.25,
+  dexterityEffectCap: 10,
+  baseEvasionPercent: 10,
+  maxEvasionPercent: 40,
+  baseCriticalPercent: 5,
+  maxCriticalPercent: 30,
+  maxDamageResistance: 50,
+  enemyRarityChance: { normal: 0.8, uncommon: 0.15, elite: 0.05 } satisfies Record<Rarity, number>,
+} as const;
+
+export const DERIVED_FORMULAS = {
+  maxHp: (stats: Record<Attribute, number>, level: number) =>
+    10 + 10 * (level - 1) + 10 * (stats.vit - 1),
+  // O documento define 2 MP iniciais para o Mago; o piso estende uma reserva mínima aos demais combatentes.
+  maxMp: (stats: Record<Attribute, number>, _level: number) => 2 + 2 * (stats.int - 1),
+  physicalDamage: (stats: Record<Attribute, number>, level: number) => ({
+    min: Math.max(1, stats.for + level - 2),
+    max: stats.for + level + 2,
+  }),
+  magicDamage: (stats: Record<Attribute, number>, level: number) => ({
+    min: Math.max(1, stats.int + level - 2),
+    max: stats.int + level + 2,
+  }),
+  evasionPercent: (stats: Record<Attribute, number>) => Math.min(RULES.maxEvasionPercent,
+    Math.round(RULES.baseEvasionPercent + (Math.min(stats.dex, RULES.dexterityEffectCap) - 1) / 9 * 30)),
+  extraTurnSpeed: (stats: Record<Attribute, number>) => 10 + 2 * (stats.dex - 1),
+  criticalPercent: (stats: Record<Attribute, number>) => Math.min(RULES.maxCriticalPercent,
+    Math.round(RULES.baseCriticalPercent + (Math.min(stats.dex, RULES.dexterityEffectCap) - 1) / 9 * 25)),
+  damageResistancePercent: (stats: Record<Attribute, number>) =>
+    Math.min(RULES.maxDamageResistance, Math.max(0, 50 * (stats.vit - 1) / 9)),
+};

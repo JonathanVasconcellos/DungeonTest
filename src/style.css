@@ -1,0 +1,4 @@
+* { box-sizing: border-box; }
+html, body, #game { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #10100f; }
+body { touch-action: none; }
+canvas { image-rendering: pixelated; }
