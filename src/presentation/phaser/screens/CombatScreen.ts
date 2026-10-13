@@ -11,6 +11,7 @@ import { canUseClassSkillSupport, classSkillIsSupport } from '../../../game/comb
 import { criticalChance, defenseValue, effectiveVitality, formatMana } from '../../../game/rules/combat';
 import { SPECIALIZATIONS } from '../../../game/content/specializations';
 import type { ClassId, EnemyIntent, Entity, RunState } from '../../../game/types';
+import { enemyTextureKey } from '../GameAssets';
 import { addButton, addText, drawBar, drawSewerBackground, PALETTE as C, VIEWPORT } from '../SceneUi';
 
 export type CombatAnimation = 'player-attack' | 'heavy-attack' | 'double-attack' | 'fire' | 'enemy-attack' | 'defend' | 'none'
@@ -75,14 +76,11 @@ export function renderCombatScreen(
   }
 
   const isBoss = run.rooms[run.roomIndex]?.event === 'boss';
-  const species = isBoss ? 'boss'
-    : enemy.name.includes('Esqueleto') ? 'skeleton'
-    : enemy.name.includes('Slime') ? 'slime' : 'goblin';
-  const enemyClass = enemy.classId ?? 'warrior';
-  const hasMutantArtwork = enemy.mutated && !isBoss;
-  const enemyTexture = hasMutantArtwork
-    ? `enemy-mutant-${species}-${enemyClass}`
-    : `enemy-${species}-${enemyClass}`;
+  const selectedEnemyTexture = enemyTextureKey(enemy, isBoss);
+  const fallbackEnemyTexture = isBoss ? 'enemy-boss'
+    : enemy.name.includes('Esqueleto') ? 'enemy-skeleton'
+    : enemy.name.includes('Slime') ? 'enemy-slime' : 'enemy-goblin';
+  const enemyTexture = scene.textures.exists(selectedEnemyTexture) ? selectedEnemyTexture : fallbackEnemyTexture;
   const enemyWidth = isBoss ? 205 : 154;
   const enemyHeight = isBoss ? 252 : 205;
   const enemySprite = scene.add.image(VIEWPORT.width / 2, 320, enemyTexture).setDepth(3);

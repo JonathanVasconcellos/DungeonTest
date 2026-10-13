@@ -29,7 +29,7 @@ export const RULES = {
   playerAbilityCancelChance: 0.25,
   heavyAttackManaCost: 1,
   doubleAttackManaCost: 1,
-  enemyAbilityManaCost: { normal: 1, uncommon: 1, elite: 1 } satisfies Record<Rarity, number>,
+  enemySpellManaCost: 2,
   fireArrowDamageMultiplier: 1,
   fireArrowBurnChance: 0.3,
   burnDamageMultiplier: 0.3,
@@ -41,12 +41,12 @@ export const RULES = {
   baseCriticalPercent: 5,
   maxCriticalPercent: 30,
   maxDamageResistance: 50,
-  enemyRarityChance: { normal: 0.8, uncommon: 0.15, elite: 0.05 } satisfies Record<Rarity, number>,
+  enemyRarityChance: { normal: 0.95, uncommon: 0.04, elite: 0.01 } satisfies Record<Rarity, number>,
 } as const;
 
 export const DERIVED_FORMULAS = {
   maxHp: (stats: Record<Attribute, number>, level: number) =>
-    10 + 10 * (level - 1) + 10 * (stats.vit - 1),
+    20 + 10 * (level - 1) + 10 * (stats.vit - 1),
   // O documento define 2 MP iniciais para o Mago; o piso estende uma reserva mínima aos demais combatentes.
   maxMp: (stats: Record<Attribute, number>, _level: number) => 2 + 2 * (stats.int - 1),
   physicalDamage: (stats: Record<Attribute, number>, level: number) => ({

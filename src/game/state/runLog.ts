@@ -11,6 +11,7 @@ export function captureRunLogSnapshot(run: RunState): RunLogSnapshot {
     playerSpeed: flow.playerSpeed, enemySpeed: flow.enemySpeed,
     playerExtraPending: flow.playerExtraPending, enemyExtraPending: flow.enemyExtraPending,
     playerBurningTurns: run.player.burning?.turnsRemaining, enemyBurningTurns: run.enemy?.burning?.turnsRemaining,
+    playerPoisonedTurns: run.player.poisoned?.turnsRemaining, enemyPoisonedTurns: run.enemy?.poisoned?.turnsRemaining,
     playerHealingTurns: run.player.healingOverTime?.turnsRemaining, enemyHealingTurns: run.enemy?.healingOverTime?.turnsRemaining,
     playerMagicShield: run.player.magicShield, enemyMagicShield: run.enemy?.magicShield,
     defending: run.defending, enemyIntent: run.enemyIntent,
@@ -65,14 +66,23 @@ export function recordCombatAction(
   const stats = run.combatStats;
   const after = captureRunLogSnapshot(run);
   if (consumesTurn) run.combatTurn = (run.combatTurn ?? 0) + 1;
+  // Detailed action rows are appended by the controller just before this summary call.
+  // Stamp that batch with the completed action's turn number (the first action is turn 1).
+  const log = run.combatLog ?? [];
+  for (let index = log.length - 1; index >= 0 && log[index].before === before; index -= 1) {
+    if (log[index].combatId === run.combatId) log[index].turn = run.combatTurn;
+  }
   stats.actions += 1;
   const dealt = actor === 'player'
     ? Math.max(0, (before.enemyHp ?? 0) - (after.enemyHp ?? 0))
     : Math.max(0, before.playerHp - after.playerHp);
   if (actor === 'player') stats.playerDamage += dealt;
   else stats.enemyDamage += dealt;
-  if (visual?.kind === 'dodge') stats.misses += 1;
-  else if (visual?.kind === 'hit') stats.hits += visual.hitDetails?.length ?? 1;
+  if (visual?.kind === 'dodge') stats.misses += visual.attackType === 'double' ? 2 : 1;
+  else if (visual?.kind === 'hit') {
+    stats.hits += visual.hitDetails?.length ?? 1;
+    stats.misses += visual.evadedHits ?? 0;
+  }
   if (visual?.kind === 'hit') stats.criticals += visual.hitDetails
     ? visual.hitDetails.filter((hit) => hit.critical).length : visual.critical ? 1 : 0;
   if (/habilidade|magia|flecha|míssil|ataque pesado|ataque duplo/i.test(action)) stats.abilities += 1;
@@ -82,6 +92,8 @@ export function recordCombatAction(
   if (mpAfter > mpBefore) stats.manaRecovered += mpAfter - mpBefore;
   const effectApplied = (after.playerBurningTurns ?? 0) > (before.playerBurningTurns ?? 0)
     || (after.enemyBurningTurns ?? 0) > (before.enemyBurningTurns ?? 0)
+    || (after.playerPoisonedTurns ?? 0) > (before.playerPoisonedTurns ?? 0)
+    || (after.enemyPoisonedTurns ?? 0) > (before.enemyPoisonedTurns ?? 0)
     || (!before.playerMagicShield && after.playerMagicShield === true)
     || (!before.enemyMagicShield && after.enemyMagicShield === true);
   const healingApplied = before.playerHealingTurns !== after.playerHealingTurns
@@ -130,6 +142,10 @@ function formatChanges(before: RunLogSnapshot, after: RunLogSnapshot): string {
     changes.push(`Queimadura no jogador: ${after.playerBurningTurns ?? 0} turno(s)`);
   if (before.enemyBurningTurns !== after.enemyBurningTurns)
     changes.push(`Queimadura em ${after.enemyName ?? 'inimigo'}: ${after.enemyBurningTurns ?? 0} turno(s)`);
+  if (before.playerPoisonedTurns !== after.playerPoisonedTurns)
+    changes.push(`Veneno no jogador: ${after.playerPoisonedTurns ?? 0} turno(s)`);
+  if (before.enemyPoisonedTurns !== after.enemyPoisonedTurns)
+    changes.push(`Veneno em ${after.enemyName ?? 'inimigo'}: ${after.enemyPoisonedTurns ?? 0} turno(s)`);
   if (before.playerHealingTurns !== after.playerHealingTurns)
     changes.push(`Regeneração no jogador: ${after.playerHealingTurns ?? 0} turno(s)`);
   if (before.enemyHealingTurns !== after.enemyHealingTurns)
@@ -160,7 +176,9 @@ function inferCategory(text: string): RunLogCategory {
   if (lower.includes('queimad') || lower.includes('regenera') || lower.includes('efeito')) return 'effect';
   if (lower.includes('xp') || lower.includes('poção') || lower.includes('item')) return 'reward';
   if (lower.includes('sala ')) return 'room';
-  if (lower.includes('inimigo executa') || lower.includes('cálculo do ataque básico inimigo') || lower.includes('cálculo pesado')) return 'enemy-action';
+  if (lower.includes('inimigo executa')
+    || (lower.includes('cálculo do ataque básico') && lower.includes('inimigo'))
+    || lower.includes('cálculo pesado')) return 'enemy-action';
   if (lower.startsWith('você ') || lower.startsWith('ataque') || lower.startsWith('míssil') || lower.startsWith('cálculo:')) return 'player-action';
   return 'system';
 }

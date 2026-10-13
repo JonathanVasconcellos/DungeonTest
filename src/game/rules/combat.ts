@@ -7,6 +7,9 @@ export interface DamageRange { min: number; max: number; type: DamageType }
 
 /** Ataque básico de cada classe; os multiplicadores ficam centralizados em RULES. */
 export function basicAttackRange(entity: Entity, classId: ClassId): DamageRange {
+  if (classId === 'mage') {
+    return { ...DERIVED_FORMULAS.magicDamage(entity.stats, entity.level), type: 'magical' };
+  }
   const physical = DERIVED_FORMULAS.physicalDamage(entity.stats, entity.level);
   if (classId === 'rogue') {
     const effectiveStats = {
@@ -58,9 +61,9 @@ export function alchemistPoisonDamage(damage: number, entity: Entity): number {
   return Math.max(1, Math.floor(damage * (rank >= 3 ? 0.35 : rank >= 2 ? 0.3 : 0.25)));
 }
 
-/** Guerreiro ganha resistência adicional abaixo de metade da vida, inclusive inimigos. */
+/** A passiva de resistência pertence à classe Guerreiro, inclusive para inimigos. */
 export function effectiveVitality(entity: Entity): number {
-  return entity.stats.vit + (entity.specialization === 'knight' && entity.hp < entity.maxHp * 0.5 ? entity.stats.for : 0);
+  return entity.stats.vit + (entity.classId === 'warrior' && entity.hp < entity.maxHp * 0.5 ? entity.stats.for : 0);
 }
 
 /** Redução efetiva exibida no log e usada no cálculo do dano. */

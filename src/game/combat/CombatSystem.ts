@@ -26,7 +26,7 @@ export function chooseEnemyIntent(
   player: RunState['player'],
 ): EnemyIntent {
   const classId = enemy.classId ?? 'warrior';
-  const abilityManaCost = classId === 'mage' ? RULES.enemyAbilityManaCost[enemy.rarity] : 0;
+  const abilityManaCost = classId === 'mage' ? RULES.enemySpellManaCost : 0;
   const abilityChance = enemyAbilityChance(enemy, player);
   if (!randomChance(abilityChance * 100)) return 'basic-attack';
   if (enemy.classSkill && enemy.level >= RULES.classSkillUnlockLevel
@@ -80,7 +80,8 @@ export function resolvePlayerAttack(run: RunState): CombatResult {
 
   const visual: CombatVisualCue = { kind: 'hit', target: 'enemy', amount: damage, critical, attackType: range.type };
   const manaNote = manaRestored ? ` +${formatMana(manaRestored)} MP` : '';
-  const details = `Cálculo: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (chance ${criticalChance(run.player)}%), resistência ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality}), redução aplicada ${Math.max(0, criticalDamage - damage)}, dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`;
+  const damageLabel = range.type === 'magical' ? 'mágico' : 'físico';
+  const details = `Ataque básico ${damageLabel}: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (chance ${criticalChance(run.player)}%), resistência ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality}), redução aplicada ${Math.max(0, criticalDamage - damage)}, dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`;
   if (enemy.hp <= 0) return { ...result('enemy-defeated', details, `Você derrotou ${enemy.name} com ${damage} de dano${critical ? ' crítico' : ''}.${manaNote}`), actionConsumed: true, visual };
   return { ...result('continue', details, `Você causou ${damage} de dano${critical ? ' crítico' : ''}.${manaNote}`), actionConsumed: true, visual };
 }
@@ -187,7 +188,7 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
   run.enemyInterruptedIntent = undefined;
   const enemyAbilityManaCost = intent === 'heavy-attack' ? RULES.heavyAttackManaCost
     : intent === 'double-attack' ? RULES.doubleAttackManaCost
-    : intent === 'fire-arrow' ? RULES.enemyAbilityManaCost[enemy.rarity]
+    : intent === 'fire-arrow' ? RULES.enemySpellManaCost
     : intent.endsWith('-class-skill') && enemy.classSkill ? CLASS_SKILLS[enemy.classSkill].manaCost : 0;
   run.enemyIntent = 'basic-attack';
   const messages: string[] = [];
@@ -309,7 +310,8 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       const poisonNote = applyAlchemistPoison(enemy, player, damage);
       const manaRestored = regenerateManaOnBasicAttackHit(enemy, critical);
       visual = { kind: 'hit', target: 'player', amount: damage, critical, attackType: range.type };
-      messages.push(`Cálculo do ataque básico inimigo: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(enemy)}%), resistência passiva ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}, redução total ${Math.max(0, criticalDamage - damage)}, dano ${damage}${manaRestored ? `, +${formatMana(manaRestored)} MP` : ''}.${poisonNote ? ` ${poisonNote}` : ''}`);
+      const damageLabel = range.type === 'magical' ? 'mágico' : 'físico';
+      messages.push(`Cálculo do ataque básico ${damageLabel} inimigo: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(enemy)}%), resistência passiva ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}, redução total ${Math.max(0, criticalDamage - damage)}, dano ${damage}${manaRestored ? `, +${formatMana(manaRestored)} MP` : ''}.${poisonNote ? ` ${poisonNote}` : ''}`);
     }
   }
   }

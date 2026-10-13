@@ -27,10 +27,12 @@
 
 ## Colaboração e isolamento
 
+- Consulte `.agents/EQUIPE_IA.md` para papéis, limites de decisão e fluxo de aprovação do diretor.
 - Toda tarefa delegada deve declarar objetivo, arquivos/área permitidos, limites explícitos, dependências e critério de conclusão.
 - Um agente por vez é responsável por cada arquivo. Não permita edições concorrentes no mesmo checkout.
 - Prefira uma branch/worktree isolada para cada agente que vá editar código; revise e integre mudanças uma por vez.
-- O checkout atual não contém metadados Git (`git rev-parse` falha). Até o projeto estar em um repositório Git, delegações neste diretório devem ser somente de leitura; não execute agentes de edição paralela aqui.
+- Confirme que o checkout tem metadados Git antes de criar worktrees ou delegar edições. Se não tiver, mantenha agentes em modo somente leitura até usar um checkout Git.
+- Neste repositório, prefira uma worktree por agente editor; não use a mesma cópia de trabalho para edições concorrentes.
 - O agente integrador é responsável por comparar a implementação às regras acordadas, resolver conflitos e executar a verificação final.
 
 ## Verificação

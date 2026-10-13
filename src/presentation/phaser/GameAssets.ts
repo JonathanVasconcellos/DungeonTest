@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { Entity } from '../../game/types';
 import povWarriorSword from '../../assets/pov-warrior-sword.png';
 import povRogueDagger from '../../assets/pov-rogue-dagger.png';
 import povMageWand from '../../assets/pov-mage-wand.png';
@@ -37,6 +38,98 @@ import treasureChest from '../../assets/event-treasure-chest.png';
 import restBonfire from '../../assets/event-rest-bonfire.png';
 import roomForwardArrow from '../../assets/room-forward-arrow.png';
 
+const ENEMY_VARIANT_URLS: Record<string, string> = {
+  'enemy-goblin-warrior': enemyGoblinWarrior,
+  'enemy-goblin-rogue': enemyGoblinRogue,
+  'enemy-goblin-mage': enemyGoblinMage,
+  'enemy-skeleton-warrior': enemySkeletonWarrior,
+  'enemy-skeleton-rogue': enemySkeletonRogue,
+  'enemy-skeleton-mage': enemySkeletonMage,
+  'enemy-slime-warrior': enemySlimeWarrior,
+  'enemy-slime-rogue': enemySlimeRogue,
+  'enemy-slime-mage': enemySlimeMage,
+  'enemy-boss-warrior': enemyBossWarrior,
+  'enemy-boss-rogue': enemyBossRogue,
+  'enemy-boss-mage': enemyBossMage,
+  'enemy-mutant-goblin-warrior': mutantGoblinWarrior,
+  'enemy-mutant-goblin-rogue': mutantGoblinRogue,
+  'enemy-mutant-goblin-mage': mutantGoblinMage,
+  'enemy-mutant-slime-warrior': mutantSlimeWarrior,
+  'enemy-mutant-slime-rogue': mutantSlimeRogue,
+  'enemy-mutant-slime-mage': mutantSlimeMage,
+  'enemy-mutant-skeleton-warrior': mutantSkeletonWarrior,
+  'enemy-mutant-skeleton-rogue': mutantSkeletonRogue,
+  'enemy-mutant-skeleton-mage': mutantSkeletonMage,
+};
+
+const pendingEnemyLoads = new WeakMap<Phaser.Scene, Map<string, Promise<void>>>();
+
+export function enemyTextureKey(enemy: Entity, isBoss: boolean): string {
+  const species = isBoss ? 'boss'
+    : enemy.name.includes('Esqueleto') ? 'skeleton'
+    : enemy.name.includes('Slime') ? 'slime' : 'goblin';
+  const enemyClass = enemy.classId ?? 'warrior';
+  return enemy.mutated && !isBoss
+    ? `enemy-mutant-${species}-${enemyClass}`
+    : `enemy-${species}-${enemyClass}`;
+}
+
+/** Load one selected enemy variant on first use; Phaser retains it in its texture cache. */
+export function loadEnemyVariant(scene: Phaser.Scene, key: string): Promise<void> {
+  if (scene.textures.exists(key)) return Promise.resolve();
+
+  const url = ENEMY_VARIANT_URLS[key];
+  if (!url) return Promise.reject(new Error(`Textura de inimigo desconhecida: ${key}`));
+
+  let sceneLoads = pendingEnemyLoads.get(scene);
+  if (!sceneLoads) {
+    sceneLoads = new Map<string, Promise<void>>();
+    pendingEnemyLoads.set(scene, sceneLoads);
+  }
+  const pending = sceneLoads.get(key);
+  if (pending) return pending;
+
+  const load = new Promise<void>((resolve, reject) => {
+    const completeEvent = `${Phaser.Loader.Events.FILE_KEY_COMPLETE}-image-${key}`;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const onComplete = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onLoaderComplete = (): void => {
+      cleanup();
+      if (scene.textures.exists(key)) resolve();
+      else reject(new Error(`Textura de inimigo não foi registrada: ${key}`));
+    };
+    const onError = (file: Phaser.Loader.File): void => {
+      if (file.key !== key) return;
+      cleanup();
+      reject(new Error(`Falha ao carregar textura de inimigo: ${key}`));
+    };
+    const cleanup = (): void => {
+      if (timeout !== undefined) clearTimeout(timeout);
+      scene.load.off(completeEvent, onComplete);
+      scene.load.off(Phaser.Loader.Events.COMPLETE, onLoaderComplete);
+      scene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+    };
+
+    scene.load.once(completeEvent, onComplete);
+    scene.load.once(Phaser.Loader.Events.COMPLETE, onLoaderComplete);
+    scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+    scene.load.image(key, url);
+    // Never leave the scene on a loading screen if the browser fails to emit a loader event.
+    timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Tempo esgotado ao carregar textura de inimigo: ${key}`));
+    }, 5000);
+    scene.load.start();
+  });
+
+  sceneLoads.set(key, load);
+  void load.catch(() => sceneLoads?.delete(key));
+  return load;
+}
+
 export function loadGameAssets(scene: Phaser.Scene): void {
   scene.load.image('pov-warrior-sword', povWarriorSword);
   scene.load.image('pov-rogue-dagger', povRogueDagger);
@@ -47,27 +140,6 @@ export function loadGameAssets(scene: Phaser.Scene): void {
   scene.load.image('enemy-skeleton', enemySkeleton);
   scene.load.image('enemy-slime', enemySlime);
   scene.load.image('enemy-boss', enemyBoss);
-  scene.load.image('enemy-goblin-warrior', enemyGoblinWarrior);
-  scene.load.image('enemy-goblin-rogue', enemyGoblinRogue);
-  scene.load.image('enemy-goblin-mage', enemyGoblinMage);
-  scene.load.image('enemy-skeleton-warrior', enemySkeletonWarrior);
-  scene.load.image('enemy-skeleton-rogue', enemySkeletonRogue);
-  scene.load.image('enemy-skeleton-mage', enemySkeletonMage);
-  scene.load.image('enemy-slime-warrior', enemySlimeWarrior);
-  scene.load.image('enemy-slime-rogue', enemySlimeRogue);
-  scene.load.image('enemy-slime-mage', enemySlimeMage);
-  scene.load.image('enemy-boss-warrior', enemyBossWarrior);
-  scene.load.image('enemy-boss-rogue', enemyBossRogue);
-  scene.load.image('enemy-boss-mage', enemyBossMage);
-  scene.load.image('enemy-mutant-goblin-warrior', mutantGoblinWarrior);
-  scene.load.image('enemy-mutant-goblin-rogue', mutantGoblinRogue);
-  scene.load.image('enemy-mutant-goblin-mage', mutantGoblinMage);
-  scene.load.image('enemy-mutant-slime-warrior', mutantSlimeWarrior);
-  scene.load.image('enemy-mutant-slime-rogue', mutantSlimeRogue);
-  scene.load.image('enemy-mutant-slime-mage', mutantSlimeMage);
-  scene.load.image('enemy-mutant-skeleton-warrior', mutantSkeletonWarrior);
-  scene.load.image('enemy-mutant-skeleton-rogue', mutantSkeletonRogue);
-  scene.load.image('enemy-mutant-skeleton-mage', mutantSkeletonMage);
   scene.load.image('item-healing-potion', healingPotionIcon);
   scene.load.image('item-xp-potion', xpPotionIcon);
   scene.load.image('spell-fire-arrow', fireArrowIcon);

@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { GameController, type GameTransition } from '../game/application/GameController';
 import type { ClassId, Entity, RunState, Stats } from '../game/types';
 import type { CombatVisualCue } from '../game/combat/CombatSystem';
-import { clearScene } from '../presentation/phaser/SceneUi';
-import { loadGameAssets } from '../presentation/phaser/GameAssets';
+import { addText, clearScene, drawSewerBackground, VIEWPORT } from '../presentation/phaser/SceneUi';
+import { enemyTextureKey, loadEnemyVariant, loadGameAssets } from '../presentation/phaser/GameAssets';
 import { renderMenuScreen } from '../presentation/phaser/screens/MenuScreen';
 import {
   animationForIntent, renderClassAbilityScreen, renderCombatScreen, renderEntityInfoScreen, renderMagicListScreen,
@@ -62,11 +62,33 @@ export class GameScene extends Phaser.Scene {
 
   private applyTransition(transition: GameTransition): void {
     if (transition.view === 'combat') {
-      this.busy = transition.waitForEnemy === true;
-      const feedback = transition.feedback ?? 'none';
-      this.drawCombat(transition.note ?? '', feedback === 'enemy-turn'
-        ? animationForIntent(this.run?.enemyIntent) : feedback, transition.visual);
-      if (transition.waitForEnemy) this.time.delayedCall(ENEMY_ACTION_DELAY_MS, () => this.enemyTurn());
+      const run = this.run;
+      if (!run?.enemy) return;
+      const enemy = run.enemy;
+      const isBoss = run.rooms[run.roomIndex]?.event === 'boss';
+      const textureKey = enemyTextureKey(enemy, isBoss);
+      const presentCombat = (): void => {
+        if (this.run?.enemy !== enemy) return;
+        this.busy = transition.waitForEnemy === true;
+        const feedback = transition.feedback ?? 'none';
+        this.drawCombat(transition.note ?? '', feedback === 'enemy-turn'
+          ? animationForIntent(this.run?.enemyIntent) : feedback, transition.visual);
+        if (transition.waitForEnemy) this.time.delayedCall(ENEMY_ACTION_DELAY_MS, () => this.enemyTurn());
+      };
+
+      if (this.textures.exists(textureKey)) {
+        presentCombat();
+        return;
+      }
+
+      this.busy = true;
+      this.clear();
+      drawSewerBackground(this);
+      addText(this, VIEWPORT.width / 2, VIEWPORT.height / 2, 'CARREGANDO INIMIGO…', 16);
+      void loadEnemyVariant(this, textureKey).then(presentCombat).catch(() => {
+        // CombatScreen falls back to the preloaded generic species sprite if this variant fails.
+        presentCombat();
+      });
       return;
     }
     if (transition.visual && this.run?.enemy) {

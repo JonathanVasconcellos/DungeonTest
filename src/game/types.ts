@@ -18,6 +18,7 @@ export interface RunLogSnapshot {
   playerSpeed?: number; enemySpeed?: number;
   playerExtraPending?: boolean; enemyExtraPending?: boolean;
   playerBurningTurns?: number; enemyBurningTurns?: number; playerMagicShield?: boolean; enemyMagicShield?: boolean;
+  playerPoisonedTurns?: number; enemyPoisonedTurns?: number;
   playerHealingTurns?: number; enemyHealingTurns?: number;
   defending?: boolean; enemyIntent?: EnemyIntent;
 }
