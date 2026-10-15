@@ -1,0 +1,628 @@
+{
+  "method": {
+    "runsPerClassPerScenario": 100,
+    "totalRuns": 600,
+    "seedBase": 202610130000,
+    "seedFormula": "seedBase+classIndex*10000+runIndex; unique seeds paired across scenarios",
+    "rng": "gameplay RNG and decision/upgrades RNG are separate deterministic streams; the same seed gives identical policy decision sequence and upgrade draws for both arms",
+    "policy": "Same tactical policy in both arms: free healing item at HP<=60%, defender/escudo against dangerous telegraphed skill at low HP, offensive class ability/fire arrow with 68% opportunity chance, random weighted upgrades favor primary stat/VIT, uniform specialization.",
+    "intervention": "Harness only: after normal engine damage calculation, for each landed direct enemy hit, if enemy rarity normal, level 1, floor 1, roomIndex 0-2, replace damage d with max(1,d-1). No damage-over-time change. Game source/rules unchanged.",
+    "limitations": "The treatment correction is applied to post-resolution direct-hit amounts parsed from combat log. If it rescues a fatal hit, harness restores combat state and rolls the next enemy intent; temporary effects cleared by GameController game-over cleanup remain ended. Any censored/runner-error attempts are listed explicitly."
+  },
+  "validation": {
+    "runs": 600,
+    "completed": 600,
+    "outcomes": {
+      "death": 594,
+      "boss-killed": 6,
+      "step-limit": 0,
+      "runner-error": 0,
+      "treatmentRescueAsTerminalOutcome": 0
+    }
+  },
+  "byClass": {
+    "warrior": {
+      "control": {
+        "attempts": 100,
+        "deaths": 100,
+        "deathRate": 1,
+        "censored": 0,
+        "censoredRuns": [],
+        "deathsByRoom": {
+          "1": 21,
+          "2": 23,
+          "3": 22,
+          "4": 11,
+          "5": 9,
+          "6": 4,
+          "7": 3,
+          "8": 2,
+          "9": 1,
+          "10": 4
+        },
+        "reachedBoss": 4,
+        "bossKilled": 0,
+        "room1EndHp": {
+          "count": 79,
+          "mean": 24.91
+        },
+        "bossEntry": [
+          {
+            "hp": 70,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 35,
+            "mp": 1.75,
+            "level": 3
+          },
+          {
+            "hp": 50,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 40,
+            "mp": 2,
+            "level": 2
+          }
+        ],
+        "enemiesDefeated": {
+          "mean": 1.66,
+          "median": 1
+        },
+        "maxLevel": {
+          "mean": 1.59,
+          "median": 2,
+          "max": 3
+        },
+        "damageTaken": {
+          "mean": 67.12,
+          "perAttempt": 67.12
+        },
+        "actions": {
+          "basic": {
+            "total": 1130,
+            "perAttempt": 11.3
+          },
+          "heavy": {
+            "total": 566,
+            "perAttempt": 5.66
+          },
+          "double": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "fireArrow": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "classSkill": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "defend": {
+            "total": 241,
+            "perAttempt": 2.41
+          },
+          "magicShield": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "potions": {
+            "total": 20,
+            "perAttempt": 0.2
+          }
+        }
+      },
+      "treatment": {
+        "attempts": 100,
+        "deaths": 99,
+        "deathRate": 0.99,
+        "censored": 0,
+        "censoredRuns": [],
+        "deathsByRoom": {
+          "2": 12,
+          "3": 34,
+          "4": 16,
+          "5": 13,
+          "6": 8,
+          "7": 5,
+          "8": 3,
+          "9": 2,
+          "10": 6
+        },
+        "reachedBoss": 7,
+        "bossKilled": 1,
+        "room1EndHp": {
+          "count": 100,
+          "mean": 25.96
+        },
+        "bossEntry": [
+          {
+            "hp": 60,
+            "mp": 1.75,
+            "level": 3
+          },
+          {
+            "hp": 70,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 70,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 70,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 50,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 40,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 40,
+            "mp": 2,
+            "level": 2
+          }
+        ],
+        "enemiesDefeated": {
+          "mean": 2.53,
+          "median": 2
+        },
+        "maxLevel": {
+          "mean": 2.05,
+          "median": 2,
+          "max": 4
+        },
+        "damageTaken": {
+          "mean": 87.28,
+          "perAttempt": 87.28
+        },
+        "actions": {
+          "basic": {
+            "total": 1621,
+            "perAttempt": 16.21
+          },
+          "heavy": {
+            "total": 756,
+            "perAttempt": 7.56
+          },
+          "double": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "fireArrow": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "classSkill": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "defend": {
+            "total": 322,
+            "perAttempt": 3.22
+          },
+          "magicShield": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "potions": {
+            "total": 31,
+            "perAttempt": 0.31
+          }
+        }
+      },
+      "paired": {
+        "deathDelta": 1,
+        "room1Deaths": {
+          "control": 21,
+          "treatment": 0
+        },
+        "reachedBossDelta": 3,
+        "bossKillsDelta": 1
+      },
+      "treatmentRescuedAttempts": {
+        "count": 11,
+        "denominator": 100,
+        "rate": 0.11
+      },
+      "treatmentFatalHitRescueEvents": 21
+    },
+    "rogue": {
+      "control": {
+        "attempts": 100,
+        "deaths": 98,
+        "deathRate": 0.98,
+        "censored": 0,
+        "censoredRuns": [],
+        "deathsByRoom": {
+          "1": 35,
+          "2": 24,
+          "3": 19,
+          "4": 7,
+          "5": 4,
+          "6": 1,
+          "7": 3,
+          "8": 1,
+          "9": 1,
+          "10": 3
+        },
+        "reachedBoss": 5,
+        "bossKilled": 2,
+        "room1EndHp": {
+          "count": 65,
+          "mean": 17.57
+        },
+        "bossEntry": [
+          {
+            "hp": 60,
+            "mp": 1.75,
+            "level": 3
+          },
+          {
+            "hp": 60,
+            "mp": 1.5,
+            "level": 3
+          },
+          {
+            "hp": 43,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 50,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 50,
+            "mp": 1.25,
+            "level": 3
+          }
+        ],
+        "enemiesDefeated": {
+          "mean": 1.28,
+          "median": 1
+        },
+        "maxLevel": {
+          "mean": 1.44,
+          "median": 1,
+          "max": 4
+        },
+        "damageTaken": {
+          "mean": 38.99,
+          "perAttempt": 38.99
+        },
+        "actions": {
+          "basic": {
+            "total": 577,
+            "perAttempt": 5.77
+          },
+          "heavy": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "double": {
+            "total": 366,
+            "perAttempt": 3.66
+          },
+          "fireArrow": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "classSkill": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "defend": {
+            "total": 135,
+            "perAttempt": 1.35
+          },
+          "magicShield": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "potions": {
+            "total": 11,
+            "perAttempt": 0.11
+          }
+        }
+      },
+      "treatment": {
+        "attempts": 100,
+        "deaths": 97,
+        "deathRate": 0.97,
+        "censored": 0,
+        "censoredRuns": [],
+        "deathsByRoom": {
+          "1": 2,
+          "2": 19,
+          "3": 26,
+          "4": 17,
+          "5": 12,
+          "6": 3,
+          "7": 7,
+          "8": 7,
+          "9": 1,
+          "10": 3
+        },
+        "reachedBoss": 6,
+        "bossKilled": 3,
+        "room1EndHp": {
+          "count": 98,
+          "mean": 16.26
+        },
+        "bossEntry": [
+          {
+            "hp": 60,
+            "mp": 1.5,
+            "level": 3
+          },
+          {
+            "hp": 66,
+            "mp": 1.75,
+            "level": 4
+          },
+          {
+            "hp": 43,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 50,
+            "mp": 2,
+            "level": 3
+          },
+          {
+            "hp": 60,
+            "mp": 1.5,
+            "level": 3
+          },
+          {
+            "hp": 50,
+            "mp": 1.25,
+            "level": 3
+          }
+        ],
+        "enemiesDefeated": {
+          "mean": 2.51,
+          "median": 2
+        },
+        "maxLevel": {
+          "mean": 1.99,
+          "median": 2,
+          "max": 5
+        },
+        "damageTaken": {
+          "mean": 64.42,
+          "perAttempt": 64.42
+        },
+        "actions": {
+          "basic": {
+            "total": 1097,
+            "perAttempt": 10.97
+          },
+          "heavy": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "double": {
+            "total": 616,
+            "perAttempt": 6.16
+          },
+          "fireArrow": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "classSkill": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "defend": {
+            "total": 254,
+            "perAttempt": 2.54
+          },
+          "magicShield": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "potions": {
+            "total": 30,
+            "perAttempt": 0.3
+          }
+        }
+      },
+      "paired": {
+        "deathDelta": 1,
+        "room1Deaths": {
+          "control": 35,
+          "treatment": 2
+        },
+        "reachedBossDelta": 1,
+        "bossKillsDelta": 1
+      },
+      "treatmentRescuedAttempts": {
+        "count": 40,
+        "denominator": 100,
+        "rate": 0.4
+      },
+      "treatmentFatalHitRescueEvents": 119
+    },
+    "mage": {
+      "control": {
+        "attempts": 100,
+        "deaths": 100,
+        "deathRate": 1,
+        "censored": 0,
+        "censoredRuns": [],
+        "deathsByRoom": {
+          "1": 69,
+          "2": 15,
+          "3": 10,
+          "4": 3,
+          "5": 3
+        },
+        "reachedBoss": 0,
+        "bossKilled": 0,
+        "room1EndHp": {
+          "count": 31,
+          "mean": 15.32
+        },
+        "bossEntry": [],
+        "enemiesDefeated": {
+          "mean": 0.36,
+          "median": 0
+        },
+        "maxLevel": {
+          "mean": 1.11,
+          "median": 1,
+          "max": 2
+        },
+        "damageTaken": {
+          "mean": 26.81,
+          "perAttempt": 26.81
+        },
+        "actions": {
+          "basic": {
+            "total": 335,
+            "perAttempt": 3.35
+          },
+          "heavy": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "double": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "fireArrow": {
+            "total": 305,
+            "perAttempt": 3.05
+          },
+          "classSkill": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "defend": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "magicShield": {
+            "total": 114,
+            "perAttempt": 1.14
+          },
+          "potions": {
+            "total": 9,
+            "perAttempt": 0.09
+          }
+        }
+      },
+      "treatment": {
+        "attempts": 100,
+        "deaths": 100,
+        "deathRate": 1,
+        "censored": 0,
+        "censoredRuns": [],
+        "deathsByRoom": {
+          "1": 5,
+          "2": 18,
+          "3": 38,
+          "4": 21,
+          "5": 10,
+          "6": 5,
+          "7": 2,
+          "8": 1
+        },
+        "reachedBoss": 0,
+        "bossKilled": 0,
+        "room1EndHp": {
+          "count": 95,
+          "mean": 13.36
+        },
+        "bossEntry": [],
+        "enemiesDefeated": {
+          "mean": 1.56,
+          "median": 2
+        },
+        "maxLevel": {
+          "mean": 1.76,
+          "median": 2,
+          "max": 3
+        },
+        "damageTaken": {
+          "mean": 49.97,
+          "perAttempt": 49.97
+        },
+        "actions": {
+          "basic": {
+            "total": 1135,
+            "perAttempt": 11.35
+          },
+          "heavy": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "double": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "fireArrow": {
+            "total": 575,
+            "perAttempt": 5.75
+          },
+          "classSkill": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "defend": {
+            "total": 0,
+            "perAttempt": 0
+          },
+          "magicShield": {
+            "total": 289,
+            "perAttempt": 2.89
+          },
+          "potions": {
+            "total": 26,
+            "perAttempt": 0.26
+          }
+        }
+      },
+      "paired": {
+        "deathDelta": 0,
+        "room1Deaths": {
+          "control": 69,
+          "treatment": 5
+        },
+        "reachedBossDelta": 0,
+        "bossKillsDelta": 0
+      },
+      "treatmentRescuedAttempts": {
+        "count": 76,
+        "denominator": 100,
+        "rate": 0.76
+      },
+      "treatmentFatalHitRescueEvents": 401
+    }
+  },
+  "interpretation": {
+    "classification": "Exploratório; não é inferência causal.",
+    "caveats": [
+      "O dano do tratamento foi ajustado após a resolução do turno e pode ocorrer depois da limpeza de efeitos por game-over.",
+      "A RNG do jogo e os draws de política/upgrades podem divergir entre os braços quando os caminhos mudam.",
+      "As contagens de resgate foram reconstruídas dos eventos compactos comparando HP pré-turno, dano efetivo mais mitigação e HP pós-turno; não são desfechos terminais."
+    ]
+  }
+}

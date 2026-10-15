@@ -1,0 +1,688 @@
+{
+  "method": {
+    "runsPerClass": 100,
+    "classes": [
+      "warrior",
+      "rogue",
+      "mage"
+    ],
+    "seedBase": 202610130000,
+    "seedFormula": "seedBase + classIndex*10000 + runIndex (index 1..100); LCG Math.random, state=(1664525*state+1013904223) mod 2^32.",
+    "target": "Até morte ou conclusão do chefe da sala 10 do primeiro andar.",
+    "policy": "Tática probabilística: cura gratuita com poção em HP<=60%; Defender/Escudo Mágico com intenção ofensiva e HP baixo ou dano previsto perigoso; habilidade ofensiva em 68% das oportunidades com MP; habilidades de especialização em 45% das oportunidades quando aptas; melhorias aleatórias favorecem atributo primário e VIT; especialização escolhida uniformemente.",
+    "limitations": "Simulação da lógica GameController sem interface/tempo de animações. Política artificial não é comportamento real de jogadores. Cada classe tem 100 sementes, suficiente para sinais preliminares, não prova de equilíbrio; RNG determinístico por partida. 11 tentativas ficaram em level-up sem progresso e atingiram a guarda técnica de 10.000 iterações (Guerreiro 6, Ladino 5, Mago 0); são censuradas, não mortes nem vitórias. As taxas de sala 10 usam 100 tentativas/classe, sem imputar essas tentativas como mortes."
+  },
+  "rulesObserved": {
+    "maxHp": "20 + 10*(level-1) + 10*(VIT-1)",
+    "enemyFireArrowManaCost": 2,
+    "playerFireArrowManaCost": 2,
+    "postCombatRecovery": "HP + floor(maxHP/2), MP + floor(maxMP/3), capped"
+  },
+  "byClass": {
+    "warrior": {
+      "classId": "warrior",
+      "className": "Guerreiro",
+      "attempts": 100,
+      "reachedRoom10": {
+        "count": 1,
+        "rate": 0.01
+      },
+      "bossKilled": {
+        "count": 0,
+        "rate": 0
+      },
+      "deathsByRoom": {
+        "1": 21,
+        "2": 22,
+        "3": 22,
+        "4": 11,
+        "5": 10,
+        "6": 5,
+        "7": 2,
+        "10": 1
+      },
+      "deathsByEnemyClassRarityMutation": {
+        "mage/elite/normal": 2,
+        "warrior/uncommon/normal": 8,
+        "warrior/normal/normal": 34,
+        "warrior/normal/mutante": 5,
+        "rogue/normal/normal": 20,
+        "rogue/uncommon/normal": 4,
+        "mage/uncommon/normal": 4,
+        "mage/normal/normal": 6,
+        "rogue/elite/mutante": 1,
+        "warrior/uncommon/mutante": 1,
+        "rogue/normal/mutante": 3,
+        "mage/uncommon/mutante": 1,
+        "warrior/elite/normal": 3,
+        "rogue/elite/normal": 2
+      },
+      "maxPlayerLevel": {
+        "max": 3,
+        "median": 2,
+        "values": [
+          2,
+          2,
+          3,
+          1,
+          3,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          2,
+          3,
+          2,
+          2,
+          2,
+          1,
+          2,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          2,
+          1,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          3,
+          2,
+          2,
+          3,
+          1,
+          1,
+          2,
+          2,
+          1,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          2,
+          1,
+          2,
+          1,
+          2
+        ]
+      },
+      "enemiesDefeated": {
+        "mean": 1.63,
+        "median": 2,
+        "total": 163
+      },
+      "bossEntry": {
+        "count": 1,
+        "playerHp": {
+          "mean": 40,
+          "median": 40
+        },
+        "playerHpPercent": {
+          "mean": 100
+        },
+        "playerMp": {
+          "mean": 1,
+          "median": 1
+        },
+        "playerLevel": {
+          "mean": 2,
+          "median": 2
+        }
+      },
+      "eventsEntered": {
+        "combat": 256,
+        "rest": 28,
+        "chest": 22,
+        "empty": 9,
+        "boss": 1
+      },
+      "actionFrequency": {
+        "basicAttack": {
+          "total": 1061,
+          "perRun": 10.61,
+          "runsWithUse": 100
+        },
+        "heavyAttack": {
+          "total": 526,
+          "perRun": 5.26,
+          "runsWithUse": 100
+        },
+        "doubleAttack": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "fireArrow": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "classSkill": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "defend": {
+          "total": 236,
+          "perRun": 2.36,
+          "runsWithUse": 89
+        },
+        "magicShield": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "healingPotions": {
+          "total": 15,
+          "perRun": 0.15,
+          "runsWithUse": 12
+        }
+      },
+      "upgrades": {
+        "for": 26698,
+        "dex": 2991,
+        "int": 3118,
+        "vit": 26867
+      },
+      "specializations": {},
+      "censoredStepLimit": 6
+    },
+    "rogue": {
+      "classId": "rogue",
+      "className": "Ladino",
+      "attempts": 100,
+      "reachedRoom10": {
+        "count": 1,
+        "rate": 0.01
+      },
+      "bossKilled": {
+        "count": 0,
+        "rate": 0
+      },
+      "deathsByRoom": {
+        "1": 27,
+        "2": 32,
+        "3": 15,
+        "4": 10,
+        "5": 6,
+        "6": 4,
+        "10": 1
+      },
+      "deathsByEnemyClassRarityMutation": {
+        "rogue/normal/normal": 17,
+        "mage/normal/normal": 8,
+        "warrior/elite/normal": 6,
+        "warrior/normal/mutante": 8,
+        "warrior/normal/normal": 28,
+        "warrior/uncommon/normal": 5,
+        "mage/normal/mutante": 1,
+        "rogue/normal/mutante": 2,
+        "mage/uncommon/normal": 5,
+        "mage/elite/normal": 3,
+        "rogue/elite/normal": 5,
+        "mage/uncommon/mutante": 2,
+        "rogue/uncommon/mutante": 2,
+        "rogue/uncommon/normal": 3
+      },
+      "maxPlayerLevel": {
+        "max": 3,
+        "median": 1,
+        "values": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          3,
+          2,
+          1,
+          1,
+          2,
+          2,
+          1,
+          2,
+          2,
+          2,
+          3,
+          2,
+          2,
+          1,
+          1,
+          1,
+          2,
+          3,
+          2,
+          1,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          3,
+          1,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          2,
+          3,
+          1
+        ]
+      },
+      "enemiesDefeated": {
+        "mean": 1.35,
+        "median": 1,
+        "total": 135
+      },
+      "bossEntry": {
+        "count": 1,
+        "playerHp": {
+          "mean": 24,
+          "median": 24
+        },
+        "playerHpPercent": {
+          "mean": 80
+        },
+        "playerMp": {
+          "mean": 1.75,
+          "median": 1.75
+        },
+        "playerLevel": {
+          "mean": 2,
+          "median": 2
+        }
+      },
+      "eventsEntered": {
+        "combat": 229,
+        "rest": 23,
+        "chest": 13,
+        "empty": 6,
+        "boss": 1
+      },
+      "actionFrequency": {
+        "basicAttack": {
+          "total": 575,
+          "perRun": 5.75,
+          "runsWithUse": 99
+        },
+        "heavyAttack": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "doubleAttack": {
+          "total": 380,
+          "perRun": 3.8,
+          "runsWithUse": 97
+        },
+        "fireArrow": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "classSkill": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "defend": {
+          "total": 153,
+          "perRun": 1.53,
+          "runsWithUse": 75
+        },
+        "magicShield": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "healingPotions": {
+          "total": 15,
+          "perRun": 0.15,
+          "runsWithUse": 14
+        }
+      },
+      "upgrades": {
+        "for": 2518,
+        "dex": 22351,
+        "int": 2490,
+        "vit": 22418
+      },
+      "specializations": {},
+      "censoredStepLimit": 5
+    },
+    "mage": {
+      "classId": "mage",
+      "className": "Mago",
+      "attempts": 100,
+      "reachedRoom10": {
+        "count": 0,
+        "rate": 0
+      },
+      "bossKilled": {
+        "count": 0,
+        "rate": 0
+      },
+      "deathsByRoom": {
+        "1": 66,
+        "2": 25,
+        "3": 5,
+        "4": 3,
+        "6": 1
+      },
+      "deathsByEnemyClassRarityMutation": {
+        "rogue/normal/normal": 33,
+        "warrior/normal/normal": 43,
+        "mage/normal/normal": 10,
+        "rogue/normal/mutante": 4,
+        "rogue/uncommon/normal": 1,
+        "mage/uncommon/normal": 2,
+        "mage/elite/normal": 2,
+        "warrior/normal/mutante": 3,
+        "warrior/uncommon/normal": 1,
+        "mage/normal/mutante": 1
+      },
+      "maxPlayerLevel": {
+        "max": 2,
+        "median": 1,
+        "values": [
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "enemiesDefeated": {
+        "mean": 0.33,
+        "median": 0,
+        "total": 33
+      },
+      "bossEntry": {
+        "count": 0,
+        "playerHp": {
+          "mean": null,
+          "median": null
+        },
+        "playerHpPercent": {
+          "mean": null
+        },
+        "playerMp": {
+          "mean": null,
+          "median": null
+        },
+        "playerLevel": {
+          "mean": null,
+          "median": null
+        }
+      },
+      "eventsEntered": {
+        "combat": 140,
+        "chest": 4,
+        "rest": 5
+      },
+      "actionFrequency": {
+        "basicAttack": {
+          "total": 324,
+          "perRun": 3.24,
+          "runsWithUse": 97
+        },
+        "heavyAttack": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "doubleAttack": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "fireArrow": {
+          "total": 297,
+          "perRun": 2.97,
+          "runsWithUse": 97
+        },
+        "classSkill": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "defend": {
+          "total": 0,
+          "perRun": 0,
+          "runsWithUse": 0
+        },
+        "magicShield": {
+          "total": 99,
+          "perRun": 0.99,
+          "runsWithUse": 65
+        },
+        "healingPotions": {
+          "total": 4,
+          "perRun": 0.04,
+          "runsWithUse": 3
+        }
+      },
+      "upgrades": {
+        "for": 1,
+        "dex": 0,
+        "int": 5,
+        "vit": 2
+      },
+      "specializations": {},
+      "censoredStepLimit": 0
+    }
+  }
+}

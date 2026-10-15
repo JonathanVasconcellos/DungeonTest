@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { Entity } from '../../game/types';
+import type { ClassSkillId } from '../../game/content/classSkills';
 import povWarriorSword from '../../assets/pov-warrior-sword.png';
 import povRogueDagger from '../../assets/pov-rogue-dagger.png';
 import povMageWand from '../../assets/pov-mage-wand.png';
@@ -37,6 +38,17 @@ import sewerBackground from '../../assets/dungeon-corridor-perspective.png';
 import treasureChest from '../../assets/event-treasure-chest.png';
 import restBonfire from '../../assets/event-rest-bonfire.png';
 import roomForwardArrow from '../../assets/room-forward-arrow.png';
+import warriorCrushingBlowIcon from '../../assets/skill-warrior-crushing-blow.png';
+import warriorAegisIcon from '../../assets/skill-warrior-aegis.png';
+import rogueDeadlyThrustIcon from '../../assets/skill-rogue-deadly-thrust.png';
+import roguePoisonBladeIcon from '../../assets/skill-rogue-poison-blade.png';
+import mageArcaneLanceIcon from '../../assets/skill-mage-arcane-lance.png';
+import mageArcaneRestorationIcon from '../../assets/skill-mage-arcane-restoration.png';
+import statusBurningIcon from '../../assets/status/status-burning.png';
+import statusPoisonedIcon from '../../assets/status/status-poisoned.png';
+import statusHealingOverTimeIcon from '../../assets/status/status-healing-over-time.png';
+import statusMagicShieldIcon from '../../assets/status/status-magic-shield.png';
+import statusPhysicalDefenseIcon from '../../assets/status/status-physical-defense.png';
 
 const ENEMY_VARIANT_URLS: Record<string, string> = {
   'enemy-goblin-warrior': enemyGoblinWarrior,
@@ -61,6 +73,23 @@ const ENEMY_VARIANT_URLS: Record<string, string> = {
   'enemy-mutant-skeleton-rogue': mutantSkeletonRogue,
   'enemy-mutant-skeleton-mage': mutantSkeletonMage,
 };
+
+export const CLASS_SKILL_TEXTURES: Record<ClassSkillId, string> = {
+  'warrior-crushing-blow': 'skill-warrior-crushing-blow',
+  'warrior-aegis': 'skill-warrior-aegis',
+  'rogue-deadly-thrust': 'skill-rogue-deadly-thrust',
+  'rogue-poison-blade': 'skill-rogue-poison-blade',
+  'mage-arcane-lance': 'skill-mage-arcane-lance',
+  'mage-arcane-restoration': 'skill-mage-arcane-restoration',
+};
+
+export const STATUS_TEXTURES = {
+  burning: 'status-burning',
+  poisoned: 'status-poisoned',
+  healingOverTime: 'status-healing-over-time',
+  magicShield: 'status-magic-shield',
+  physicalDefense: 'status-physical-defense',
+} as const;
 
 const pendingEnemyLoads = new WeakMap<Phaser.Scene, Map<string, Promise<void>>>();
 
@@ -147,4 +176,15 @@ export function loadGameAssets(scene: Phaser.Scene): void {
   scene.load.image('event-treasure-chest', treasureChest);
   scene.load.image('event-rest-bonfire', restBonfire);
   scene.load.image('room-forward-arrow', roomForwardArrow);
+  scene.load.image('skill-warrior-crushing-blow', warriorCrushingBlowIcon);
+  scene.load.image('skill-warrior-aegis', warriorAegisIcon);
+  scene.load.image('skill-rogue-deadly-thrust', rogueDeadlyThrustIcon);
+  scene.load.image('skill-rogue-poison-blade', roguePoisonBladeIcon);
+  scene.load.image('skill-mage-arcane-lance', mageArcaneLanceIcon);
+  scene.load.image('skill-mage-arcane-restoration', mageArcaneRestorationIcon);
+  scene.load.image(STATUS_TEXTURES.burning, statusBurningIcon);
+  scene.load.image(STATUS_TEXTURES.poisoned, statusPoisonedIcon);
+  scene.load.image(STATUS_TEXTURES.healingOverTime, statusHealingOverTimeIcon);
+  scene.load.image(STATUS_TEXTURES.magicShield, statusMagicShieldIcon);
+  scene.load.image(STATUS_TEXTURES.physicalDefense, statusPhysicalDefenseIcon);
 }

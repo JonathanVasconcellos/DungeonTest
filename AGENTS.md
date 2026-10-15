@@ -28,6 +28,8 @@
 ## Colaboração e isolamento
 
 - Consulte `.agents/EQUIPE_IA.md` para papéis, limites de decisão e fluxo de aprovação do diretor.
+- Para tarefas de implementação, consulte e delegue ao perfil específico em `.agents/programmers/FRONTEND.md` ou `.agents/programmers/BACKEND.md`.
+- Para direção visual, auditoria da identidade, briefs ou geração de arte aprovada, consulte e delegue ao perfil `.agents/design/CREATIVE_DESIGNER.md`. O designer propõe ou produz os assets; o frontend integra-os ao jogo após aprovação.
 - Toda tarefa delegada deve declarar objetivo, arquivos/área permitidos, limites explícitos, dependências e critério de conclusão.
 - Um agente por vez é responsável por cada arquivo. Não permita edições concorrentes no mesmo checkout.
 - Prefira uma branch/worktree isolada para cada agente que vá editar código; revise e integre mudanças uma por vez.

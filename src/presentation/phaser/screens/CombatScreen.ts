@@ -11,8 +11,8 @@ import { canUseClassSkillSupport, classSkillIsSupport } from '../../../game/comb
 import { criticalChance, defenseValue, effectiveVitality, formatMana } from '../../../game/rules/combat';
 import { SPECIALIZATIONS } from '../../../game/content/specializations';
 import type { ClassId, EnemyIntent, Entity, RunState } from '../../../game/types';
-import { enemyTextureKey } from '../GameAssets';
-import { addButton, addText, drawBar, drawSewerBackground, PALETTE as C, VIEWPORT } from '../SceneUi';
+import { CLASS_SKILL_TEXTURES, enemyTextureKey, STATUS_TEXTURES } from '../GameAssets';
+import { addButton, addPanel, addText, drawBar, drawSewerBackground, showManpu, PALETTE as C, VIEWPORT } from '../SceneUi';
 
 export type CombatAnimation = 'player-attack' | 'heavy-attack' | 'double-attack' | 'fire' | 'enemy-attack' | 'defend' | 'none'
   | 'heavy-prepare' | 'double-prepare' | 'fire-prepare' | 'enemy-dodge' | 'player-dodge';
@@ -26,6 +26,26 @@ export interface CombatScreenActions {
   onUsePotion: (slot: number) => void;
   onShowInfo: (entity: Entity, title: string) => void;
   onShowLog: () => void;
+}
+
+interface StatusHudEntry {
+  texture: string;
+  label: string;
+}
+
+function drawStatusHud(scene: Phaser.Scene, entries: StatusHudEntry[], y: number, depth: number, fontSize: number): void {
+  if (!entries.length) return;
+  const widths = entries.map((entry) => 20 + Math.max(24, entry.label.length * (fontSize * 0.58)));
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0) + (entries.length - 1) * 5;
+  let x = (VIEWPORT.width - totalWidth) / 2;
+  entries.forEach((entry, index) => {
+    scene.add.image(x + 8, y + 8, entry.texture).setDisplaySize(16, 16).setDepth(depth);
+    scene.add.text(x + 19, y + 2, entry.label, {
+      fontFamily: 'Arial, sans-serif', fontSize: `${fontSize}px`, color: C.paper,
+      stroke: '#11100d', strokeThickness: 2,
+    }).setOrigin(0, 0).setDepth(depth);
+    x += widths[index]! + 5;
+  });
 }
 
 export function animationForIntent(intent?: EnemyIntent): CombatAnimation {
@@ -56,17 +76,18 @@ export function renderCombatScreen(
   addText(scene, VIEWPORT.width / 2, 57, `${enemy.name}  Nv ${enemy.level}`, 13);
   drawBar(scene, 95, 84, 230, 15, enemy.hp / enemy.maxHp, C.red, `HP ${enemy.hp}/${enemy.maxHp}`);
   addText(scene, VIEWPORT.width / 2, 105, `MANA ${formatMana(enemy.mp)}/${formatMana(enemy.maxMp)}`, 10, C.blue);
-  const enemyStatuses = [
-    enemy.burning ? `QUEIMANDO ${enemy.burning.turnsRemaining}` : '',
-    enemy.healingOverTime ? `REGEN ${enemy.healingOverTime.turnsRemaining}` : '',
-  ].filter(Boolean);
-  if (enemyStatuses.length) addText(scene, VIEWPORT.width / 2, 126, enemyStatuses.join(' • '), 10,
-    enemy.burning ? '#ff9a52' : '#91e0a1');
+  const enemyStatuses: StatusHudEntry[] = [
+    ...(enemy.burning ? [{ texture: STATUS_TEXTURES.burning, label: `FOGO ${enemy.burning.turnsRemaining}` }] : []),
+    ...(enemy.poisoned ? [{ texture: STATUS_TEXTURES.poisoned, label: `VENENO ${enemy.poisoned.turnsRemaining}` }] : []),
+    ...(enemy.healingOverTime ? [{ texture: STATUS_TEXTURES.healingOverTime, label: `CURA ${enemy.healingOverTime.turnsRemaining}` }] : []),
+    ...(enemy.magicShield ? [{ texture: STATUS_TEXTURES.magicShield, label: 'ESCUDO' }] : []),
+  ];
+  drawStatusHud(scene, enemyStatuses, 126, 13, 10);
   const intentLabels = ENEMY_ABILITY_CONTENT;
   if (run.playerTurn && run.enemyIntent && intentLabels[run.enemyIntent]) {
     const skillTelegraph = run.enemyIntent.endsWith('-class-skill') && enemy.classSkill
       ? `PREPARA ${CLASS_SKILLS[enemy.classSkill].name.toUpperCase()}` : intentLabels[run.enemyIntent]!.telegraph;
-    addText(scene, VIEWPORT.width / 2, 145, skillTelegraph, 10,
+    addText(scene, VIEWPORT.width / 2, enemyStatuses.length ? 151 : 145, skillTelegraph, 10,
       run.enemyIntent === 'fire-arrow' ? '#ff6358' : '#e4c780');
   }
   if (enemy.burning) {
@@ -94,6 +115,7 @@ export function renderCombatScreen(
       lifespan: { min: 360, max: 760 },
       frequency: 105,
       quantity: 1,
+      maxParticles: 8,
       emitZone: { type: 'random', source: { getRandomPoint: (point) => {
         point.x = Phaser.Math.Between(-enemySprite.displayWidth * 0.34, enemySprite.displayWidth * 0.34);
         point.y = Phaser.Math.Between(-enemySprite.displayHeight * 0.36, enemySprite.displayHeight * 0.32);
@@ -141,13 +163,14 @@ export function renderCombatScreen(
   drawBar(scene, 139, 568, 142, 19, player.hp / player.maxHp, C.green, `VIDA ${player.hp}/${player.maxHp}`, 10);
   drawBar(scene, 139, 601, 142, 19, player.mp / Math.max(1, player.maxMp), C.blue,
     `MANA ${formatMana(player.mp)}/${formatMana(player.maxMp)}`, 10);
-  const playerStatuses = [
-    player.burning ? `QUEIMANDO ${player.burning.turnsRemaining}` : '',
-    player.healingOverTime ? `REGEN ${player.healingOverTime.turnsRemaining}` : '',
-    player.magicShield ? 'ESCUDO MÁGICO' : run.defending ? 'DEFESA PREPARADA' : '',
-  ].filter(Boolean);
-  if (playerStatuses.length) addText(scene, VIEWPORT.width / 2, 630, playerStatuses.join(' • '), 9,
-    player.burning ? '#ff9a52' : '#b8c7c1');
+  const playerStatuses: StatusHudEntry[] = [
+    ...(player.burning ? [{ texture: STATUS_TEXTURES.burning, label: `FOGO ${player.burning.turnsRemaining}` }] : []),
+    ...(player.poisoned ? [{ texture: STATUS_TEXTURES.poisoned, label: `VENENO ${player.poisoned.turnsRemaining}` }] : []),
+    ...(player.healingOverTime ? [{ texture: STATUS_TEXTURES.healingOverTime, label: `CURA ${player.healingOverTime.turnsRemaining}` }] : []),
+    ...(player.magicShield ? [{ texture: STATUS_TEXTURES.magicShield, label: 'MÁG.' }] : []),
+    ...(run.defending ? [{ texture: STATUS_TEXTURES.physicalDefense, label: 'DEF.' }] : []),
+  ];
+  drawStatusHud(scene, playerStatuses, 622, 10, 10);
   const extraActor = run.turnScheduler?.activeExtra;
   const turnStatus = extraActor === 'player' ? 'TURNO EXTRA DO JOGADOR'
     : extraActor === 'enemy' ? 'TURNO EXTRA DO INIMIGO'
@@ -218,6 +241,7 @@ function animateCombat(
 ): void {
   if (visual) showCombatVisual(scene, enemy, visual);
   if (animation === 'player-attack') {
+    showManpu(scene, enemy.x - 2, enemy.y - 76, 'swing');
     scene.tweens.add({ targets: weapon, x: weapon.x - 34, y: weapon.y - 18, angle: 5,
       duration: 120, yoyo: true, ease: 'Sine.InOut' });
     enemy.setTint(0xffdca0);
@@ -225,6 +249,7 @@ function animateCombat(
       onComplete: () => { if (enemy.active) restoreEnemyAppearance(enemy); },
     });
   } else if (animation === 'heavy-attack') {
+    showManpu(scene, enemy.x + enemy.displayWidth * 0.36, enemy.y - 38, 'impact');
     scene.tweens.add({ targets: weapon, x: weapon.x - 42, y: weapon.y - 44, angle: 9,
       duration: 210, yoyo: true, ease: 'Cubic.Out' });
     enemy.setTint(0xffd28b);
@@ -233,11 +258,13 @@ function animateCombat(
     });
     scene.cameras.main.shake(150, 0.004);
   } else if (animation === 'double-attack') {
+    showManpu(scene, enemy.x + 1, enemy.y - 72, 'swing');
     scene.tweens.add({ targets: weapon, x: weapon.x - 32, y: weapon.y - 10, angle: -8,
       duration: 105, yoyo: true, repeat: 1, ease: 'Sine.InOut' });
     scene.tweens.add({ targets: enemy, x: enemy.x + 9, duration: 80, yoyo: true, repeat: 1,
       ease: 'Sine.InOut' });
   } else if (animation === 'fire') {
+    showManpu(scene, enemy.x + enemy.displayWidth * 0.36, enemy.y - 38, 'impact');
     const ember = scene.add.circle(344, 430, 7, 0xff8b2a).setStrokeStyle(2, 0xffdf9a).setDepth(9);
     scene.tweens.add({ targets: ember, x: enemy.x, y: enemy.y + 28, scale: 1.9, alpha: 0.25, duration: 300, ease: 'Sine.In',
       onComplete: () => {
@@ -247,6 +274,7 @@ function animateCombat(
       },
     });
   } else if (animation === 'enemy-attack') {
+    showManpu(scene, enemy.x, enemy.y - 80, 'swing');
     const attackType = visual?.kind === 'hit' ? visual.attackType : 'physical';
     if (attackType === 'magical') {
       const projectile = scene.add.circle(enemy.x, enemy.y + 10, 8, 0xff6828)
@@ -272,6 +300,7 @@ function animateCombat(
     });
     scene.cameras.main.shake(attackType === 'heavy' ? 180 : 110, attackType === 'heavy' ? 0.006 : 0.003);
   } else if (animation === 'enemy-dodge') {
+    showManpu(scene, enemy.x - 52, enemy.y, 'dodge');
     const originalX = enemy.x;
     scene.tweens.add({ targets: enemy, x: originalX + 24, y: enemy.y - 10, angle: 3,
       duration: 110, yoyo: true, ease: 'Sine.InOut', onComplete: () => enemy.setAngle(0) });
@@ -280,23 +309,28 @@ function animateCombat(
     weapon.angle = -3;
     scene.tweens.add({ targets: weapon, angle: 0, duration: 180, ease: 'Sine.Out' });
   } else if (animation === 'player-dodge') {
+    showManpu(scene, 320, 476, 'dodge');
     const originalX = weapon.x;
     scene.tweens.add({ targets: weapon, x: originalX + 34, angle: 4, duration: 110,
       yoyo: true, ease: 'Sine.InOut', onComplete: () => { if (weapon.active) weapon.setAngle(0); } });
     scene.tweens.add({ targets: enemy, x: enemy.x - 10, duration: 110, yoyo: true, ease: 'Sine.InOut' });
     scene.cameras.main.shake(120, 0.0025);
   } else if (animation === 'defend') {
+    showManpu(scene, leftProp.x + 55, leftProp.y - 50, 'prepare');
     scene.tweens.add({ targets: leftProp, x: leftProp.x + 18, y: leftProp.y - 30,
       scaleX: leftProp.scaleX * 1.42, scaleY: leftProp.scaleY * 1.42,
       duration: 290, ease: 'Cubic.Out' });
   } else if (animation === 'heavy-prepare') {
+    showManpu(scene, enemy.x, enemy.y - 86, 'prepare');
     scene.tweens.add({ targets: enemy, scaleX: enemy.scaleX * 1.13, scaleY: enemy.scaleY * 1.13, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
   } else if (animation === 'double-prepare') {
+    showManpu(scene, enemy.x, enemy.y - 86, 'prepare');
     const x = enemy.x, y = enemy.y;
     scene.tweens.add({ targets: enemy, x: x - 12, y: y - 5, duration: 150, yoyo: true, repeat: 5, ease: 'Sine.InOut',
       onComplete: () => { if (enemy.active) enemy.setPosition(x, y); },
     });
   } else if (animation === 'fire-prepare') {
+    showManpu(scene, enemy.x, enemy.y - 86, 'prepare');
     enemy.setTint(0xff5148);
     const aura = scene.add.ellipse(enemy.x, enemy.y, 145, 190, 0xff2118, 0.14).setStrokeStyle(3, 0xff5148, 0.85).setDepth(2);
     scene.tweens.add({ targets: [aura, enemy], alpha: 0.5, duration: 280, yoyo: true, repeat: 3,
@@ -366,7 +400,7 @@ export function renderEntityInfoScreen(
   isBusy: () => boolean,
 ): void {
   scene.add.rectangle(VIEWPORT.width / 2, 380, VIEWPORT.width, VIEWPORT.height, 0x080807, 0.9).setInteractive().setDepth(20);
-  scene.add.rectangle(VIEWPORT.width / 2, 380, 346, 562, 0x1a1a17).setStrokeStyle(3, 0x6c654d).setDepth(21);
+  addPanel(scene, VIEWPORT.width / 2, 380, 346, 562).setDepth(21);
   addText(scene, VIEWPORT.width / 2, 117, title, 21).setDepth(22);
   addText(scene, VIEWPORT.width / 2, 157, `${entity.name}  •  Nível ${entity.level}`, 14, C.muted).setDepth(22);
   const isPlayer = entity === run.player;
@@ -417,7 +451,7 @@ export function renderMagicListScreen(
   onCastClassSkill: () => void,
 ): void {
   scene.add.rectangle(VIEWPORT.width / 2, 380, VIEWPORT.width, VIEWPORT.height, 0x080807, 0.9).setInteractive().setDepth(20);
-  scene.add.rectangle(VIEWPORT.width / 2, 380, 346, 540, 0x1a1a17).setStrokeStyle(3, 0x6c654d).setDepth(21);
+  addPanel(scene, VIEWPORT.width / 2, 380, 346, 540).setDepth(21);
   addText(scene, VIEWPORT.width / 2, 202, 'MAGIAS', 21).setDepth(22);
   if (run.classId === 'mage') {
     addText(scene, VIEWPORT.width / 2, 246,
@@ -442,6 +476,7 @@ export function renderMagicListScreen(
       addButton(scene, isBusy, VIEWPORT.width / 2, 516, 270, 48,
         `${skill.name.toUpperCase()} • ${skill.manaCost} MP`, onCastClassSkill, '#29251d', 23,
         false, run.player.mp >= skill.manaCost && skillUsable);
+      scene.add.image(56, 516, CLASS_SKILL_TEXTURES[skill.id]).setDisplaySize(26, 26).setDepth(24);
       addText(scene, VIEWPORT.width / 2, 550, skill.description, 10, C.muted).setDepth(22);
     }
   } else addText(scene, VIEWPORT.width / 2, 327, 'Você ainda não conhece magias.', 13, C.muted).setDepth(22);
@@ -460,7 +495,7 @@ export function renderClassAbilityScreen(
   const warrior = run.classId === 'warrior';
   const cost = warrior ? RULES.heavyAttackManaCost : RULES.doubleAttackManaCost;
   scene.add.rectangle(VIEWPORT.width / 2, 380, VIEWPORT.width, VIEWPORT.height, 0x080807, 0.9).setInteractive().setDepth(20);
-  scene.add.rectangle(VIEWPORT.width / 2, 380, 346, 420, 0x1a1a17).setStrokeStyle(3, 0x6c654d).setDepth(21);
+  addPanel(scene, VIEWPORT.width / 2, 380, 346, 420).setDepth(21);
   addText(scene, VIEWPORT.width / 2, 238, 'HABILIDADE', 21).setDepth(22);
   addText(scene, VIEWPORT.width / 2, 291,
     `Mana disponível: ${formatMana(run.player.mp)}/${formatMana(run.player.maxMp)}`, 12, C.muted).setDepth(22);
@@ -476,6 +511,7 @@ export function renderClassAbilityScreen(
     addButton(scene, isBusy, VIEWPORT.width / 2, 448, 286, 48,
       `${skill.name.toUpperCase()} • ${skill.manaCost} MP`, onUseClassSkill, '#29251d', 23,
       false, run.player.mp >= skill.manaCost);
+    scene.add.image(51, 448, CLASS_SKILL_TEXTURES[skill.id]).setDisplaySize(24, 24).setDepth(24);
     addText(scene, VIEWPORT.width / 2, 484, skill.description, 10, C.muted).setDepth(22);
   }
   addButton(scene, isBusy, VIEWPORT.width / 2, 542, 190, 44, 'VOLTAR', onClose, '#29251d', 23, true);

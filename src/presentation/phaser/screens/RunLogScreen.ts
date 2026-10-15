@@ -13,30 +13,66 @@ export function renderRunLogScreen(scene: Phaser.Scene, run: RunState, onClose: 
 
   const view = { x: 34, y: 132, width: 352, height: 540 };
   const lines = run.combatLog?.length ? formatEntries([...run.combatLog].reverse()) : ['Ainda não há eventos registrados.'];
-  const body = scene.add.text(0, 0, lines.join('\n\n'), {
+  const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
     fontFamily: 'Arial, sans-serif', fontSize: '14px', color: '#201d17', lineSpacing: 7,
     wordWrap: { width: view.width - 30, useAdvancedWrap: true },
-  }).setOrigin(0, 0);
-  const content = scene.add.container(view.x + 5, view.y + 5, [body]).setDepth(33);
+  };
   const maskShape = scene.add.graphics().fillStyle(0xffffff).fillRect(view.x, view.y, view.width - 12, view.height).setVisible(false);
-  content.setMask(maskShape.createGeometryMask());
+  const mask = maskShape.createGeometryMask();
   scene.add.rectangle(view.x + view.width / 2 - 4, view.y + view.height / 2, view.width - 12, view.height, 0xe6dab4)
     .setStrokeStyle(1, 0x8c7957).setDepth(32);
 
+  // Measure each event independently so no single Canvas texture grows with the whole run log.
+  const rowHeights = lines.map((line) => {
+    const measurement = scene.make.text({ x: 0, y: 0, text: line, style: textStyle }, false);
+    const height = measurement.height + 14;
+    measurement.destroy();
+    return height;
+  });
+  const rowOffsets: number[] = [0];
+  for (const height of rowHeights) rowOffsets.push(rowOffsets[rowOffsets.length - 1] + height);
+  const contentHeight = rowOffsets[rowOffsets.length - 1];
+
   const trackX = view.x + view.width - 6;
   scene.add.rectangle(trackX, view.y + view.height / 2, 5, view.height, 0x302e25).setDepth(34);
-  const maxScroll = Math.max(0, body.height - view.height + 10);
-  const thumbHeight = maxScroll > 0 ? Math.max(32, view.height * view.height / body.height) : view.height;
+  const maxScroll = Math.max(0, contentHeight - view.height + 10);
+  const thumbHeight = maxScroll > 0 ? Math.max(32, view.height * view.height / contentHeight) : view.height;
   const trackTop = view.y;
   const thumbTravel = view.height - thumbHeight;
   const thumb = scene.add.rectangle(trackX, trackTop + thumbHeight / 2, 5, thumbHeight, 0xb7a981).setDepth(35);
   let scroll = 0;
   let dragStartY = 0;
   let dragStartScroll = 0;
+  let visibleTexts: Array<{ index: number; text: Phaser.GameObjects.Text }> = [];
+  const firstRowAt = (offset: number): number => {
+    let low = 0;
+    let high = lines.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (rowOffsets[middle + 1] <= offset) low = middle + 1;
+      else high = middle;
+    }
+    return Math.min(low, Math.max(0, lines.length - 1));
+  };
+  const renderWindow = (): void => {
+    const first = firstRowAt(scroll);
+    const last = firstRowAt(Math.min(contentHeight, scroll + view.height + 120));
+    const wanted = Array.from({ length: Math.max(1, last - first + 1) }, (_unused, offset) => first + offset);
+    if (wanted.length === visibleTexts.length && wanted.every((index, offset) => visibleTexts[offset].index === index)) {
+      visibleTexts.forEach(({ index, text }) => text.setY(view.y + 5 + rowOffsets[index] - scroll));
+      return;
+    }
+    visibleTexts.forEach(({ text }) => text.destroy());
+    visibleTexts = wanted.map((index) => {
+      const text = scene.add.text(view.x + 10, view.y + 5 + rowOffsets[index] - scroll, lines[index], textStyle)
+        .setOrigin(0, 0).setDepth(33).setMask(mask);
+      return { index, text };
+    });
+  };
   const applyScroll = (value: number): void => {
     scroll = Phaser.Math.Clamp(value, 0, maxScroll);
-    content.y = view.y + 5 - scroll;
     thumb.y = trackTop + thumbHeight / 2 + (maxScroll ? thumbTravel * scroll / maxScroll : 0);
+    renderWindow();
   };
   const scrollZone = scene.add.zone(view.x + (view.width - 12) / 2, view.y + view.height / 2, view.width - 12, view.height)
     .setInteractive().setDepth(34);
@@ -51,6 +87,7 @@ export function renderRunLogScreen(scene: Phaser.Scene, run: RunState, onClose: 
     if (pointer.isDown) applyScroll(dragStartScroll + dragStartY - pointer.y);
   });
   scrollZone.on('pointerup', () => { dragStartY = 0; });
+  renderWindow();
 
   const copyStatus = addText(scene, VIEWPORT.width / 2, 681, '', 10, C.muted).setDepth(37);
   addButton(scene, () => false, 125, 721, 142, 40, 'COPIAR LOG', () => {

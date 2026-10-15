@@ -38,13 +38,38 @@
 - Usa cálculos, simulações reproduzíveis ou partidas de teste quando autorizadas e disponíveis.
 - Apresenta opções com consequências e recomenda uma, sem implementar ou alterar regras antes da aprovação.
 
+### Programador frontend — implementador
+
+- Implementa interface, apresentação visual, interações, animações, carregamento de assets e adaptação de tela.
+- Atua principalmente em `src/presentation/phaser/` e `src/scenes/`.
+- Não altera fórmulas, regras, estado ou resolução de combate em `src/game/`; solicita ao programador backend a API ou dado necessário.
+- Coordena com o integrador antes de editar arquivos compartilhados, especialmente `src/scenes/GameScene.ts` e tipos públicos.
+- Perfil reutilizável: `.agents/programmers/FRONTEND.md`.
+
+### Programador backend — implementador
+
+- Implementa regras de domínio aprovadas, combate, progressão, geração de eventos/inimigos, estado da tentativa e APIs do controlador.
+- Atua principalmente em `src/game/`.
+- Não implementa apresentação Phaser, layout, animações ou interação de tela; expõe dados e transições para o frontend.
+- Não decide mudanças de balanceamento por conta própria; aplica a especificação aprovada pelo diretor e mantém valores centralizados.
+- Coordena alterações em `src/game/types.ts` e `src/game/application/GameController.ts` com o integrador e frontend.
+- Perfil reutilizável: `.agents/programmers/BACKEND.md`.
+
+### Designer e gerente criativo — direção visual e arte
+
+- Define e documenta a identidade visual do jogo; analisa telas e assets existentes e propõe padrões coerentes de paleta, tipografia, composição, pixel art, animação e legibilidade.
+- Produz briefs visuais e, quando necessário em uma tarefa aprovada, gera imagens/sprites para revisão, especificando dimensões, transparência, recorte e uso pretendido.
+- Trabalha com o programador frontend para assegurar que a arte se encaixe no viewport móvel e na apresentação Phaser.
+- Não altera gameplay, regras ou telas de produção, nem integra, substitui ou remove assets sem escopo aprovado pelo diretor e coordenação do integrador.
+- Perfil reutilizável: `.agents/design/CREATIVE_DESIGNER.md`.
+
 ## Fluxo de trabalho
 
 1. **Pedido ou prioridade:** o integrador confirma o objetivo e identifica quais especialidades ajudam.
 2. **Diagnóstico paralelo:** agentes relevantes recebem tarefas de leitura/análise independentes. Cada tarefa informa objetivo, escopo, fontes, limites e formato da resposta.
 3. **Síntese:** o integrador remove duplicações, confere evidências e entrega ao diretor bugs confirmados, propostas e decisões necessárias.
 4. **Aprovação do diretor:** opções de produto, gameplay, balanceamento ou mudanças com impacto visível aguardam decisão. Nada é implementado apenas por ter sido recomendado.
-5. **Implementação:** após aprovação, o integrador cria tarefas de edição delimitadas. Cada agente editor usa sua própria branch/worktree quando possível; arquivos compartilhados têm um responsável por vez.
+5. **Implementação:** após aprovação, o integrador delega ao programador frontend ou backend conforme a área. Direção visual e produção de arte podem ser delegadas ao designer criativo, com entregáveis e limites definidos; integração no jogo continua sob responsabilidade frontend. Cada agente editor usa sua própria branch/worktree quando possível; arquivos compartilhados têm um responsável por vez.
 6. **Revisão e integração:** o integrador confere regras, escopo e diff; executa build/verificações aplicáveis; devolve resultado e limitações ao diretor. Não publica, faz merge remoto ou envia alterações ao GitHub sem pedido explícito.
 
 ## Formato dos relatórios
