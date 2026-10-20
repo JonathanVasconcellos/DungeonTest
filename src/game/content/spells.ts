@@ -7,6 +7,6 @@ export const SPELL_CONTENT = {
   magicShield: {
     name: 'Escudo Mágico',
     texture: 'pov-mage-grimoire',
-    damageLabel: 'redução de 50% no próximo dano',
+    damageLabel: 'redução de 50% nos próximos 2 ataques acertados',
   },
 } as const;

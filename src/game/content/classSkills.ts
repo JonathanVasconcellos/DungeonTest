@@ -30,7 +30,7 @@ export const CLASS_SKILLS: Record<ClassSkillId, ClassSkillDefinition> = {
   },
   'warrior-aegis': {
     id: 'warrior-aegis', classId: 'warrior', name: 'Postura do Baluarte',
-    description: 'Reduz o próximo dano recebido. A redução melhora nos níveis 7 e 9.',
+    description: 'Reduz o próximo ataque acertado. A redução melhora nos níveis 7 e 9.',
     manaCost: 2, attackType: 'physical', multiplier: 0, effect: 'aegis',
   },
   'rogue-deadly-thrust': {

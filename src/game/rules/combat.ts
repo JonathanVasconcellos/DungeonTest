@@ -61,9 +61,10 @@ export function alchemistPoisonDamage(damage: number, entity: Entity): number {
   return Math.max(1, Math.floor(damage * (rank >= 3 ? 0.35 : rank >= 2 ? 0.3 : 0.25)));
 }
 
-/** A passiva de resistência pertence à classe Guerreiro, inclusive para inimigos. */
+/** A passiva de resistência pertence à especialização Cavaleiro, para jogadores e inimigos. */
 export function effectiveVitality(entity: Entity): number {
-  return entity.stats.vit + (entity.classId === 'warrior' && entity.hp < entity.maxHp * 0.5 ? entity.stats.for : 0);
+  return entity.classId === 'warrior' && entity.specialization === 'knight'
+    && entity.hp < entity.maxHp * 0.5 ? entity.stats.vit + entity.stats.for : entity.stats.vit;
 }
 
 /** Redução efetiva exibida no log e usada no cálculo do dano. */
@@ -71,23 +72,44 @@ export function effectiveResistancePercent(resistancePercent: number): number {
   return Math.max(0, Math.min(100, resistancePercent));
 }
 
-/** Aplica primeiro a resistência de VIT e depois cada efeito de redução pela metade. */
+/** A mitigação passiva preserva ao menos 1 dano; a defesa ativa pode arredondar até 0. */
 export function applyDefense(damage: number, resistancePercent: number, defending = false, magicShield: boolean | number = false): number {
   const passiveResistance = effectiveResistancePercent(resistancePercent);
-  if (passiveResistance >= 100) return 0;
   let finalDamage = Math.max(1, Math.floor(damage * (1 - passiveResistance / 100)));
   const shieldReduction = typeof magicShield === 'number' ? magicShield : magicShield ? 0.5 : 0;
-  if (shieldReduction > 0) finalDamage = Math.max(1, Math.floor(finalDamage * (1 - Math.min(1, shieldReduction))));
-  if (defending) finalDamage = Math.max(1, Math.floor(finalDamage / 2));
+  // Defender and Magic Shield are exclusive defensive modifiers. If legacy or
+  // external state activates both, use the stronger one rather than stacking.
+  const activeReduction = Math.max(defending ? 0.5 : 0, shieldReduction);
+  if (activeReduction > 0) finalDamage = Math.floor(finalDamage * (1 - Math.min(1, activeReduction)));
   return finalDamage;
 }
 
-/** Regenera apenas após acerto básico; crítico não altera a recuperação. */
+/** Consumes one charge only after a successful incoming hit. */
+export function consumeMagicShieldHit(entity: Entity): boolean {
+  if (!entity.magicShield) return false;
+  const remaining = entity.magicShieldHitsRemaining ?? 2;
+  if (remaining <= 1) {
+    delete entity.magicShield;
+    delete entity.magicShieldReduction;
+    delete entity.magicShieldHitsRemaining;
+  } else {
+    entity.magicShieldHitsRemaining = remaining - 1;
+  }
+  return true;
+}
+
+/** Regenerates mana by action class; fractional MP is supported and capped. */
 export function regenerateManaOnBasicAttackHit(entity: Entity, _critical = false): number {
-  const amount = entity.classId === 'mage' ? 0.5 : 0.25;
+  const amount = entity.classId === 'mage'
+    ? RULES.manaRegenOnBasicAttack.mage : RULES.manaRegenOnBasicAttack.other;
   const restored = Math.min(amount, Math.max(0, entity.maxMp - entity.mp));
   entity.mp += restored;
   return restored;
+}
+
+/** Defender restores the same mana fraction as a normal attack by this entity. */
+export function regenerateManaOnDefense(entity: Entity): number {
+  return regenerateManaOnBasicAttackHit(entity);
 }
 
 export function formatMana(value: number): string {

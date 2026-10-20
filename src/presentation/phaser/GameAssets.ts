@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { Entity } from '../../game/types';
+import type { EnemySpeciesId, Entity } from '../../game/types';
 import type { ClassSkillId } from '../../game/content/classSkills';
 import povWarriorSword from '../../assets/pov-warrior-sword.png';
 import povRogueDagger from '../../assets/pov-rogue-dagger.png';
@@ -22,6 +22,15 @@ import enemySlimeMage from '../../assets/enemy-slime-mage.png';
 import enemyBossWarrior from '../../assets/enemy-boss-warrior.png';
 import enemyBossRogue from '../../assets/enemy-boss-rogue.png';
 import enemyBossMage from '../../assets/enemy-boss-mage.png';
+import uncommonDoll from '../../assets/enemies/uncommon-doll.png';
+import uncommonDoppelganger from '../../assets/enemies/uncommon-doppelganger.png';
+import uncommonGhost from '../../assets/enemies/uncommon-ghost.png';
+import uncommonSorceress from '../../assets/enemies/uncommon-sorceress.png';
+import uncommonMermaid from '../../assets/enemies/uncommon-mermaid.png';
+import uncommonRatkinGroup from '../../assets/enemies/uncommon-ratkin-group.png';
+import eliteSuccubus from '../../assets/enemies/elite-succubus.png';
+import eliteValkyrie from '../../assets/enemies/elite-valkyrie.png';
+import eliteDoom2 from '../../assets/enemies/elite-doom2.png';
 import mutantGoblinWarrior from '../../assets/mutant-goblin-warrior.png';
 import mutantGoblinRogue from '../../assets/mutant-goblin-rogue.png';
 import mutantGoblinMage from '../../assets/mutant-goblin-mage.png';
@@ -72,7 +81,33 @@ const ENEMY_VARIANT_URLS: Record<string, string> = {
   'enemy-mutant-skeleton-warrior': mutantSkeletonWarrior,
   'enemy-mutant-skeleton-rogue': mutantSkeletonRogue,
   'enemy-mutant-skeleton-mage': mutantSkeletonMage,
+  'enemy-species-doll': uncommonDoll,
+  'enemy-species-doppelganger': uncommonDoppelganger,
+  'enemy-species-ghost': uncommonGhost,
+  'enemy-species-sorceress': uncommonSorceress,
+  'enemy-species-mermaid': uncommonMermaid,
+  'enemy-species-ratkin_group': uncommonRatkinGroup,
+  'enemy-species-succubus': eliteSuccubus,
+  'enemy-species-valkyrie': eliteValkyrie,
+  'enemy-species-doom2': eliteDoom2,
 };
+
+/** Stable domain identifiers supplied by Entity; display names are never used to select art. */
+const NEW_SPECIES_TEXTURES: Partial<Record<EnemySpeciesId, string>> = {
+  doll: 'enemy-species-doll',
+  doppelganger: 'enemy-species-doppelganger',
+  ghost: 'enemy-species-ghost',
+  sorceress: 'enemy-species-sorceress',
+  mermaid: 'enemy-species-mermaid',
+  ratkin_group: 'enemy-species-ratkin_group',
+  succubus: 'enemy-species-succubus',
+  valkyrie: 'enemy-species-valkyrie',
+  doom2: 'enemy-species-doom2',
+};
+
+function entitySpeciesId(enemy: Entity): EnemySpeciesId | undefined {
+  return enemy.speciesId;
+}
 
 export const CLASS_SKILL_TEXTURES: Record<ClassSkillId, string> = {
   'warrior-crushing-blow': 'skill-warrior-crushing-blow',
@@ -94,18 +129,38 @@ export const STATUS_TEXTURES = {
 const pendingEnemyLoads = new WeakMap<Phaser.Scene, Map<string, Promise<void>>>();
 
 export function enemyTextureKey(enemy: Entity, isBoss: boolean): string {
+  const speciesId = entitySpeciesId(enemy);
+  if (!isBoss && enemy.rarity !== 'normal' && speciesId && NEW_SPECIES_TEXTURES[speciesId]) {
+    return NEW_SPECIES_TEXTURES[speciesId]!;
+  }
   const species = isBoss ? 'boss'
-    : enemy.name.includes('Esqueleto') ? 'skeleton'
-    : enemy.name.includes('Slime') ? 'slime' : 'goblin';
+    : speciesId === 'skeleton' || speciesId === 'slime' ? speciesId : 'goblin';
   const enemyClass = enemy.classId ?? 'warrior';
   return enemy.mutated && !isBoss
     ? `enemy-mutant-${species}-${enemyClass}`
     : `enemy-${species}-${enemyClass}`;
 }
 
+export function isIllustratedEnemyTexture(key: string): boolean {
+  return key.startsWith('enemy-species-');
+}
+
+export function fallbackEnemyTextureKey(enemy: Entity, isBoss: boolean): string {
+  if (isBoss) return 'enemy-boss';
+  const speciesId = entitySpeciesId(enemy);
+  if (speciesId === 'skeleton') return 'enemy-skeleton';
+  if (speciesId === 'slime') return 'enemy-slime';
+  return 'enemy-goblin';
+}
+
 /** Load one selected enemy variant on first use; Phaser retains it in its texture cache. */
 export function loadEnemyVariant(scene: Phaser.Scene, key: string): Promise<void> {
-  if (scene.textures.exists(key)) return Promise.resolve();
+  if (scene.textures.exists(key)) {
+    if (isIllustratedEnemyTexture(key)) {
+      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+    }
+    return Promise.resolve();
+  }
 
   const url = ENEMY_VARIANT_URLS[key];
   if (!url) return Promise.reject(new Error(`Textura de inimigo desconhecida: ${key}`));
@@ -123,6 +178,9 @@ export function loadEnemyVariant(scene: Phaser.Scene, key: string): Promise<void
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const onComplete = (): void => {
       cleanup();
+      if (isIllustratedEnemyTexture(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
       resolve();
     };
     const onLoaderComplete = (): void => {

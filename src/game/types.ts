@@ -5,6 +5,9 @@ import type { SpecializationId } from './content/specializations';
 export type Attribute = 'for' | 'dex' | 'int' | 'vit';
 export type ClassId = 'warrior' | 'rogue' | 'mage';
 export type Rarity = 'normal' | 'uncommon' | 'elite';
+/** Stable identity for enemy archetypes; independent from the localized display name. */
+export type EnemySpeciesId = 'goblin' | 'skeleton' | 'slime' | 'doll' | 'doppelganger' | 'ghost'
+  | 'sorceress' | 'mermaid' | 'ratkin_group' | 'succubus' | 'valkyrie' | 'doom2' | 'sewer_boss';
 export type EventType = 'combat' | 'empty' | 'rest' | 'chest' | 'boss';
 export type RunStatus = 'menu' | 'room' | 'combat' | 'level-up' | 'loot-choice' | 'game-over' | 'victory';
 export type EnemyIntent = 'basic-attack' | 'heavy-attack' | 'double-attack' | 'fire-arrow'
@@ -40,15 +43,20 @@ export interface TurnSchedulerState {
   simultaneousPending: boolean; extraQueue: TurnActor[];
 }
 export interface Entity {
-  name: string; level: number; rarity: Rarity; classId?: ClassId; stats: Stats;
+  name: string; level: number; rarity: Rarity; classId?: ClassId; speciesId?: EnemySpeciesId; stats: Stats;
   hp: number; maxHp: number; mp: number; maxMp: number; mutated: boolean;
   classSkill?: ClassSkillId;
+  /** Whether the enemy used an ability on its previous turn. */
+  abilityUsedLastTurn?: boolean;
   specialization?: SpecializationId;
   burning?: BurningStatus;
   poisoned?: PoisonStatus;
   healingOverTime?: HealingOverTimeStatus;
+  /** Next successful basic physical hit ignores passive resistance only. */
+  guardBroken?: boolean;
   magicShield?: boolean;
   magicShieldReduction?: number;
+  magicShieldHitsRemaining?: number;
 }
 export interface RoomPlan {
   event: EventType; enemy?: Entity; resolved?: boolean; completionAcknowledged?: boolean; completionNote?: string;

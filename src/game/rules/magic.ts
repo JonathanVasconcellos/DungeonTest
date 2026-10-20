@@ -1,7 +1,7 @@
 import { DERIVED_FORMULAS, RULES } from './config';
 import type { Entity } from '../types';
 import { randomChance, randomDamage } from './random';
-import { applyDefense, criticalChance, defenseValue, modifyAttackDamage } from './combat';
+import { applyDefense, consumeMagicShieldHit, criticalChance, defenseValue, modifyAttackDamage } from './combat';
 
 export interface FireArrowResult {
   target: Entity;
@@ -41,11 +41,11 @@ export function castFireArrow(caster: Entity, target: Entity, defending = false)
   const damage = applyDefense(criticalDamage, defense, defending,
     shielded ? target.magicShieldReduction ?? 0.5 : false);
   const nextTarget: Entity = { ...target, hp: Math.max(0, target.hp - damage) };
-  if (shielded) { delete nextTarget.magicShield; delete nextTarget.magicShieldReduction; }
+  consumeMagicShieldHit(nextTarget);
   const burnApplied = nextTarget.hp > 0 && randomChance(RULES.fireArrowBurnChance * 100);
 
   if (burnApplied) {
-    // Guarda 30% do dano realmente causado; os ticks não aplicam crítico nem VIT de novo.
+    // Guarda uma fração fixa do dano final do míssil; ticks não recalculam crítico ou resistência.
     nextTarget.burning = {
       turnsRemaining: RULES.burnDurationTurns,
       damagePerTick: Math.max(1, Math.floor(damage * RULES.burnDamageMultiplier)),

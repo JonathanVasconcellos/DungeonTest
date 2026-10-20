@@ -1,5 +1,5 @@
 import { DERIVED_FORMULAS, RULES } from '../rules/config';
-import { applyDefense, basicAttackRange, criticalChance, defenseValue, effectiveVitality, formatMana, modifyAttackDamage, regenerateManaOnBasicAttackHit } from '../rules/combat';
+import { applyDefense, basicAttackRange, consumeMagicShieldHit, criticalChance, defenseValue, effectiveVitality, formatMana, modifyAttackDamage, regenerateManaOnBasicAttackHit, regenerateManaOnDefense } from '../rules/combat';
 import { castFireArrow, tickBurning } from '../rules/magic';
 import { randomChance, randomDamage } from '../rules/random';
 import type { EnemyIntent, RunState } from '../types';
@@ -25,8 +25,11 @@ export function chooseEnemyIntent(
   enemy: NonNullable<RunState['enemy']>,
   player: RunState['player'],
 ): EnemyIntent {
+  if (enemy.rarity === 'normal' && enemy.abilityUsedLastTurn) {
+    return 'basic-attack';
+  }
   const classId = enemy.classId ?? 'warrior';
-  const abilityManaCost = classId === 'mage' ? RULES.enemySpellManaCost : 0;
+  const abilityManaCost = classId === 'mage' ? RULES.fireArrowManaCost : 0;
   const abilityChance = enemyAbilityChance(enemy, player);
   if (!randomChance(abilityChance * 100)) return 'basic-attack';
   if (enemy.classSkill && enemy.level >= RULES.classSkillUnlockLevel
@@ -72,8 +75,11 @@ export function resolvePlayerAttack(run: RunState): CombatResult {
   const criticalDamage = rawDamage * (critical ? RULES.criticalMultiplier : 1);
   const defense = defenseValue(enemy, range.type);
   const targetVitality = effectiveVitality(enemy);
-  const damage = applyDefense(criticalDamage, defense, false, enemy.magicShield ? enemy.magicShieldReduction ?? 0.5 : false);
-  if (enemy.magicShield) { delete enemy.magicShield; delete enemy.magicShieldReduction; }
+  const guardBroken = range.type === 'physical' && enemy.guardBroken === true;
+  const damage = applyDefense(criticalDamage, guardBroken ? 0 : defense, false,
+    enemy.magicShield ? enemy.magicShieldReduction ?? 0.5 : false);
+  if (guardBroken) delete enemy.guardBroken;
+  consumeMagicShieldHit(enemy);
   enemy.hp = Math.max(0, enemy.hp - damage);
   const poisonNote = applyAlchemistPoison(run.player, enemy, damage);
   const manaRestored = regenerateManaOnBasicAttackHit(run.player, critical);
@@ -81,7 +87,7 @@ export function resolvePlayerAttack(run: RunState): CombatResult {
   const visual: CombatVisualCue = { kind: 'hit', target: 'enemy', amount: damage, critical, attackType: range.type };
   const manaNote = manaRestored ? ` +${formatMana(manaRestored)} MP` : '';
   const damageLabel = range.type === 'magical' ? 'mágico' : 'físico';
-  const details = `Ataque básico ${damageLabel}: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (chance ${criticalChance(run.player)}%), resistência ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality}), redução aplicada ${Math.max(0, criticalDamage - damage)}, dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`;
+  const details = `Ataque básico ${damageLabel}: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (chance ${criticalChance(run.player)}%), resistência ${guardBroken ? 'ignorada por Guarda Quebrada' : `${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})`}, redução aplicada ${Math.max(0, criticalDamage - damage)}, dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`;
   if (enemy.hp <= 0) return { ...result('enemy-defeated', details, `Você derrotou ${enemy.name} com ${damage} de dano${critical ? ' crítico' : ''}.${manaNote}`), actionConsumed: true, visual };
   return { ...result('continue', details, `Você causou ${damage} de dano${critical ? ' crítico' : ''}.${manaNote}`), actionConsumed: true, visual };
 }
@@ -95,8 +101,9 @@ export function resolvePlayerHeavyAttack(run: RunState): CombatResult {
   const defense = defenseValue(enemy, 'physical');
   const targetVitality = effectiveVitality(enemy);
   const damage = applyDefense(rawDamage, defense, false, enemy.magicShield ? enemy.magicShieldReduction ?? 0.5 : false);
-  if (enemy.magicShield) { delete enemy.magicShield; delete enemy.magicShieldReduction; }
+  consumeMagicShieldHit(enemy);
   enemy.hp = Math.max(0, enemy.hp - damage);
+  enemy.guardBroken = true;
   const visual: CombatVisualCue = { kind: 'hit', target: 'enemy', amount: damage, attackType: 'heavy' };
   const message = `Ataque Pesado: custo ${RULES.heavyAttackManaCost} MP; acerto garantido; dano bruto máximo ${rawDamage}; resistência ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality}); redução aplicada ${Math.max(0, rawDamage - damage)}; dano final ${damage}.`;
   return enemy.hp <= 0
@@ -123,13 +130,14 @@ export function resolvePlayerDoubleAttack(run: RunState): CombatResult {
       details.push(`Golpe ${strike + 1}: esquivado (chance ${evasionChance}%).`);
       continue;
     }
-    const rawDamage = modifyAttackDamage(run.player, randomDamage(range.min, range.max), range.type);
+    const rawDamage = modifyAttackDamage(run.player,
+      Math.floor(randomDamage(range.min, range.max) * RULES.doubleAttackDamageMultiplier), range.type);
     const critical = randomChance(criticalChance(run.player));
     criticalHit ||= critical;
     const defense = defenseValue(enemy, range.type);
     const targetVitality = effectiveVitality(enemy);
     const damage = applyDefense(rawDamage * (critical ? RULES.criticalMultiplier : 1), defense, false, enemy.magicShield ? enemy.magicShieldReduction ?? 0.5 : false);
-    if (enemy.magicShield) { delete enemy.magicShield; delete enemy.magicShieldReduction; }
+    consumeMagicShieldHit(enemy);
     enemy.hp = Math.max(0, enemy.hp - damage);
     const poisonNote = applyAlchemistPoison(run.player, enemy, damage);
     total += damage;
@@ -168,8 +176,14 @@ export function resolvePlayerFireArrow(run: RunState): CombatResult {
 
 export function prepareDefense(run: RunState): boolean {
   if (!run.enemy || !run.playerTurn) return false;
+  if (run.player.magicShield) {
+    delete run.player.magicShield;
+    delete run.player.magicShieldReduction;
+    delete run.player.magicShieldHitsRemaining;
+  }
   run.defending = true;
   run.playerTurn = false;
+  regenerateManaOnDefense(run.player);
   return true;
 }
 
@@ -184,11 +198,12 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
   const intent = interrupted
     ? run.enemyInterruptedIntent ?? 'basic-attack'
     : run.enemyIntent ?? 'basic-attack';
+  enemy.abilityUsedLastTurn = intent !== 'basic-attack';
   run.enemyActionInterrupted = false;
   run.enemyInterruptedIntent = undefined;
   const enemyAbilityManaCost = intent === 'heavy-attack' ? RULES.heavyAttackManaCost
     : intent === 'double-attack' ? RULES.doubleAttackManaCost
-    : intent === 'fire-arrow' ? RULES.enemySpellManaCost
+    : intent === 'fire-arrow' ? RULES.fireArrowManaCost
     : intent.endsWith('-class-skill') && enemy.classSkill ? CLASS_SKILLS[enemy.classSkill].manaCost : 0;
   run.enemyIntent = 'basic-attack';
   const messages: string[] = [];
@@ -241,8 +256,9 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
     const targetVitality = effectiveVitality(player);
     const shielded = player.magicShield ? player.magicShieldReduction ?? 0.5 : false;
     const damage = applyDefense(rawDamage, defense, defending, shielded);
-    if (shielded) { delete player.magicShield; delete player.magicShieldReduction; }
+    consumeMagicShieldHit(player);
     player.hp = Math.max(0, player.hp - damage);
+    player.guardBroken = true;
     visual = { kind: 'hit', target: 'player', amount: damage, attackType: 'heavy' };
     messages.push(`Cálculo pesado: máximo ${rawDamage}; resistência passiva ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})${defending ? '; Defender divide por 2 após a resistência' : ''}${shielded ? '; Escudo Mágico divide por 2' : ''}; redução total ${Math.max(0, rawDamage - damage)}; dano ${damage}.`);
   } else if (intent === 'double-attack' && enemy.mp >= RULES.doubleAttackManaCost) {
@@ -257,7 +273,8 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       const evasionChance = DERIVED_FORMULAS.evasionPercent(player.stats);
       if (randomChance(evasionChance)) { evadedHits += 1; details.push(`Golpe inimigo ${strike + 1} esquivado (chance ${evasionChance}%).`); continue; }
       const range = basicAttackRange(enemy, 'rogue');
-      const rawDamage = modifyAttackDamage(enemy, randomDamage(range.min, range.max), range.type);
+      const rawDamage = modifyAttackDamage(enemy,
+        Math.floor(randomDamage(range.min, range.max) * RULES.doubleAttackDamageMultiplier), range.type);
       const critical = randomChance(criticalChance(enemy));
       criticalHit ||= critical;
       const defense = defenseValue(player, range.type);
@@ -265,7 +282,7 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       const shielded = player.magicShield ? player.magicShieldReduction ?? 0.5 : false;
       const damage = applyDefense(rawDamage * (critical ? RULES.criticalMultiplier : 1), defense,
         defending, shielded);
-      if (shielded) { delete player.magicShield; delete player.magicShieldReduction; }
+      consumeMagicShieldHit(player);
       player.hp = Math.max(0, player.hp - damage);
       const poisonNote = applyAlchemistPoison(enemy, player, damage);
       hits += 1;
@@ -304,14 +321,16 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       const defense = defenseValue(player, range.type);
       const targetVitality = effectiveVitality(player);
       const shielded = player.magicShield ? player.magicShieldReduction ?? 0.5 : false;
-      const damage = applyDefense(criticalDamage, defense, defending, shielded);
-      if (shielded) { delete player.magicShield; delete player.magicShieldReduction; }
+      const guardBroken = range.type === 'physical' && player.guardBroken === true;
+      const damage = applyDefense(criticalDamage, guardBroken ? 0 : defense, defending, shielded);
+      if (guardBroken) delete player.guardBroken;
+      consumeMagicShieldHit(player);
       player.hp = Math.max(0, player.hp - damage);
       const poisonNote = applyAlchemistPoison(enemy, player, damage);
       const manaRestored = regenerateManaOnBasicAttackHit(enemy, critical);
       visual = { kind: 'hit', target: 'player', amount: damage, critical, attackType: range.type };
       const damageLabel = range.type === 'magical' ? 'mágico' : 'físico';
-      messages.push(`Cálculo do ataque básico ${damageLabel} inimigo: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(enemy)}%), resistência passiva ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}, redução total ${Math.max(0, criticalDamage - damage)}, dano ${damage}${manaRestored ? `, +${formatMana(manaRestored)} MP` : ''}.${poisonNote ? ` ${poisonNote}` : ''}`);
+      messages.push(`Cálculo do ataque básico ${damageLabel} inimigo: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(enemy)}%), resistência passiva ${guardBroken ? 'ignorada por Guarda Quebrada' : `${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})`}${defending ? '; Defender divide após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}, redução total ${Math.max(0, criticalDamage - damage)}, dano ${damage}${manaRestored ? `, +${formatMana(manaRestored)} MP` : ''}.${poisonNote ? ` ${poisonNote}` : ''}`);
     }
   }
   }
@@ -325,7 +344,8 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
   if (run.player.hp <= 0) return { outcome: 'player-defeated', messages, visual };
   run.enemyIntent = chooseEnemyIntent(run.enemy, run.player);
   const abilityChance = enemyAbilityChance(run.enemy, run.player);
-  messages.push(`Próxima intenção inimiga: ${intentName(run.enemyIntent)} • chance de habilidade ${Math.round(abilityChance * 100)}% (HP inimigo ${Math.round(run.enemy.hp / run.enemy.maxHp * 100)}%, HP jogador ${Math.round(run.player.hp / run.player.maxHp * 100)}%).`);
+  const forcedBasicAttack = run.enemy.rarity === 'normal' && run.enemy.abilityUsedLastTurn === true;
+  messages.push(`Próxima intenção inimiga: ${intentName(run.enemyIntent)} • ${forcedBasicAttack ? 'ataque básico obrigatório / chance de habilidade 0%' : `chance de habilidade ${Math.round(abilityChance * 100)}%`} (HP inimigo ${Math.round(run.enemy.hp / run.enemy.maxHp * 100)}%, HP jogador ${Math.round(run.player.hp / run.player.maxHp * 100)}%).`);
   run.playerTurn = true;
   return { outcome: 'continue', messages, visual };
 }

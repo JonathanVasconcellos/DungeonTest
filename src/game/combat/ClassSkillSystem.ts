@@ -1,7 +1,7 @@
 import { CLASS_SKILLS, type ClassSkillId } from '../content/classSkills';
 import { skillRank } from '../content/specializations';
 import { DERIVED_FORMULAS, RULES } from '../rules/config';
-import { alchemistPoisonDamage, applyDefense, basicAttackRange, criticalChance, defenseValue, effectiveVitality, modifyAttackDamage } from '../rules/combat';
+import { alchemistPoisonDamage, applyDefense, basicAttackRange, consumeMagicShieldHit, criticalChance, defenseValue, effectiveVitality, modifyAttackDamage } from '../rules/combat';
 import { randomChance, randomDamage } from '../rules/random';
 import type { Entity, PoisonStatus } from '../types';
 import type { CombatOutcome, CombatVisualCue } from './CombatSystem';
@@ -36,7 +36,8 @@ export function resolveClassSkillSupport(caster: Entity, skillId: ClassSkillId):
     const reduction = rank >= 3 ? 0.7 : rank >= 2 ? 0.6 : 0.5;
     caster.magicShield = true;
     caster.magicShieldReduction = reduction;
-    return [`Postura do Baluarte: reduz em ${Math.round(reduction * 100)}% o próximo dano recebido.`];
+    caster.magicShieldHitsRemaining = 1;
+    return [`Postura do Baluarte: reduz em ${Math.round(reduction * 100)}% o próximo ataque acertado.`];
   }
   return [];
 }
@@ -93,7 +94,7 @@ export function resolveClassSkillAttack(
     const shielded = target.magicShield ? target.magicShieldReduction ?? 0.5 : false;
     const damage = applyDefense(criticalDamage, defense, defending, shielded);
     target.hp = Math.max(0, target.hp - damage);
-    if (shielded) { delete target.magicShield; delete target.magicShieldReduction; }
+    consumeMagicShieldHit(target);
     const rank = skillRank(attacker.level);
     const poison: PoisonStatus = { turnsRemaining: rank >= 3 ? 3 : 2,
       damagePerTick: Math.max(1, Math.floor(damage * (rank >= 3 ? 0.35 : rank >= 2 ? 0.3 : 0.25))) };
@@ -128,7 +129,7 @@ export function resolveClassSkillAttack(
     const defense = defenseValue(target, type);
     const shielded = target.magicShield ? target.magicShieldReduction ?? 0.5 : false;
     const damage = applyDefense(criticalDamage, defense, defending, shielded);
-    if (shielded) { delete target.magicShield; delete target.magicShieldReduction; }
+    consumeMagicShieldHit(target);
     target.hp = Math.max(0, target.hp - damage);
     total += damage; hitsLanded += 1; hitDetails.push({ amount: damage, critical });
     messages.push(`${skill.name}, golpe ${index + 1}: base ${base} × ${skill.multiplier * rankMultiplier} = ${rawDamage}; crítico ${critical ? 'sim' : 'não'} (${criticalPct}%); resistência ${defense.toFixed(1)}% (VIT efetiva ${effectiveVitality(target)}); dano final ${damage}.`);

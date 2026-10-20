@@ -11,7 +11,7 @@ import { canUseClassSkillSupport, classSkillIsSupport } from '../../../game/comb
 import { criticalChance, defenseValue, effectiveVitality, formatMana } from '../../../game/rules/combat';
 import { SPECIALIZATIONS } from '../../../game/content/specializations';
 import type { ClassId, EnemyIntent, Entity, RunState } from '../../../game/types';
-import { CLASS_SKILL_TEXTURES, enemyTextureKey, STATUS_TEXTURES } from '../GameAssets';
+import { CLASS_SKILL_TEXTURES, enemyTextureKey, fallbackEnemyTextureKey, isIllustratedEnemyTexture, STATUS_TEXTURES } from '../GameAssets';
 import { addButton, addPanel, addText, drawBar, drawSewerBackground, showManpu, PALETTE as C, VIEWPORT } from '../SceneUi';
 
 export type CombatAnimation = 'player-attack' | 'heavy-attack' | 'double-attack' | 'fire' | 'enemy-attack' | 'defend' | 'none'
@@ -31,21 +31,47 @@ export interface CombatScreenActions {
 interface StatusHudEntry {
   texture: string;
   label: string;
+  tint?: number;
+  color?: string;
 }
 
-function drawStatusHud(scene: Phaser.Scene, entries: StatusHudEntry[], y: number, depth: number, fontSize: number): void {
-  if (!entries.length) return;
-  const widths = entries.map((entry) => 20 + Math.max(24, entry.label.length * (fontSize * 0.58)));
-  const totalWidth = widths.reduce((sum, width) => sum + width, 0) + (entries.length - 1) * 5;
-  let x = (VIEWPORT.width - totalWidth) / 2;
-  entries.forEach((entry, index) => {
-    scene.add.image(x + 8, y + 8, entry.texture).setDisplaySize(16, 16).setDepth(depth);
-    scene.add.text(x + 19, y + 2, entry.label, {
-      fontFamily: 'Arial, sans-serif', fontSize: `${fontSize}px`, color: C.paper,
-      stroke: '#11100d', strokeThickness: 2,
-    }).setOrigin(0, 0).setDepth(depth);
-    x += widths[index]! + 5;
+function drawStatusHud(scene: Phaser.Scene, entries: StatusHudEntry[], y: number, depth: number, fontSize: number): number {
+  if (!entries.length) return 0;
+  const chipHeight = 20;
+  const gap = 4;
+  const availableWidth = VIEWPORT.width - 24;
+  const chips = entries.map((entry) => ({ entry, width: 30 + Math.max(25, entry.label.length * (fontSize * 0.57)) }));
+  const rows: typeof chips[] = [[]];
+  let rowWidth = 0;
+  chips.forEach((chip) => {
+    const currentRow = rows[rows.length - 1]!;
+    const nextWidth = rowWidth + (currentRow.length ? gap : 0) + chip.width;
+    if (nextWidth > availableWidth && currentRow.length) {
+      rows.push([chip]);
+      rowWidth = chip.width;
+      return;
+    }
+    currentRow.push(chip);
+    rowWidth = nextWidth;
   });
+
+  rows.forEach((row, rowIndex) => {
+    const totalWidth = row.reduce((sum, chip) => sum + chip.width, 0) + (row.length - 1) * gap;
+    let x = (VIEWPORT.width - totalWidth) / 2;
+    const rowY = y + rowIndex * (chipHeight + gap);
+    row.forEach(({ entry, width }) => {
+      scene.add.rectangle(x + width / 2, rowY + chipHeight / 2, width, chipHeight, 0x11100d, 0.9)
+        .setStrokeStyle(1, 0x8f7c54, 0.9).setDepth(depth);
+      const icon = scene.add.image(x + 11, rowY + chipHeight / 2, entry.texture).setDisplaySize(15, 15).setDepth(depth + 1);
+      if (entry.tint !== undefined) icon.setTint(entry.tint);
+      scene.add.text(x + 21, rowY + 3, entry.label, {
+        fontFamily: 'Arial, sans-serif', fontSize: `${fontSize}px`, color: entry.color ?? C.paper,
+        fontStyle: 'bold', stroke: '#11100d', strokeThickness: 2,
+      }).setOrigin(0, 0).setDepth(depth + 1);
+      x += width + gap;
+    });
+  });
+  return rows.length;
 }
 
 export function animationForIntent(intent?: EnemyIntent): CombatAnimation {
@@ -77,41 +103,43 @@ export function renderCombatScreen(
   drawBar(scene, 95, 84, 230, 15, enemy.hp / enemy.maxHp, C.red, `HP ${enemy.hp}/${enemy.maxHp}`);
   addText(scene, VIEWPORT.width / 2, 105, `MANA ${formatMana(enemy.mp)}/${formatMana(enemy.maxMp)}`, 10, C.blue);
   const enemyStatuses: StatusHudEntry[] = [
-    ...(enemy.burning ? [{ texture: STATUS_TEXTURES.burning, label: `FOGO ${enemy.burning.turnsRemaining}` }] : []),
-    ...(enemy.poisoned ? [{ texture: STATUS_TEXTURES.poisoned, label: `VENENO ${enemy.poisoned.turnsRemaining}` }] : []),
-    ...(enemy.healingOverTime ? [{ texture: STATUS_TEXTURES.healingOverTime, label: `CURA ${enemy.healingOverTime.turnsRemaining}` }] : []),
-    ...(enemy.magicShield ? [{ texture: STATUS_TEXTURES.magicShield, label: 'ESCUDO' }] : []),
+    ...(enemy.burning ? [{ texture: STATUS_TEXTURES.burning, label: `FOGO ${enemy.burning.turnsRemaining}T` }] : []),
+    ...(enemy.poisoned ? [{ texture: STATUS_TEXTURES.poisoned, label: `VENENO ${enemy.poisoned.turnsRemaining}T` }] : []),
+    ...(enemy.healingOverTime ? [{ texture: STATUS_TEXTURES.healingOverTime, label: `CURA ${enemy.healingOverTime.turnsRemaining}T` }] : []),
+    ...(enemy.magicShield && enemy.magicShieldHitsRemaining !== undefined && enemy.magicShieldHitsRemaining > 0
+      ? [{ texture: STATUS_TEXTURES.magicShield, label: `ESCUDO ${enemy.magicShieldHitsRemaining} GOLPES` }] : []),
+    ...(enemy.guardBroken ? [{ texture: STATUS_TEXTURES.physicalDefense, label: 'GUARDA QUEBRADA', tint: 0xff7770, color: '#ffb5a8' }] : []),
   ];
-  drawStatusHud(scene, enemyStatuses, 126, 13, 10);
+  const enemyStatusRows = drawStatusHud(scene, enemyStatuses, 119, 13, 10);
   const intentLabels = ENEMY_ABILITY_CONTENT;
   if (run.playerTurn && run.enemyIntent && intentLabels[run.enemyIntent]) {
     const skillTelegraph = run.enemyIntent.endsWith('-class-skill') && enemy.classSkill
       ? `PREPARA ${CLASS_SKILLS[enemy.classSkill].name.toUpperCase()}` : intentLabels[run.enemyIntent]!.telegraph;
-    addText(scene, VIEWPORT.width / 2, enemyStatuses.length ? 151 : 145, skillTelegraph, 10,
+    addText(scene, VIEWPORT.width / 2, enemyStatusRows ? 155 + (enemyStatusRows - 1) * 24 : 145, skillTelegraph, 10,
       run.enemyIntent === 'fire-arrow' ? '#ff6358' : '#e4c780');
   }
+  const isBoss = run.rooms[run.roomIndex]?.event === 'boss';
+  const selectedEnemyTexture = enemyTextureKey(enemy, isBoss);
+  const fallbackEnemyTexture = fallbackEnemyTextureKey(enemy, isBoss);
+  const enemyTexture = scene.textures.exists(selectedEnemyTexture) ? selectedEnemyTexture : fallbackEnemyTexture;
+  const illustratedEnemy = isIllustratedEnemyTexture(selectedEnemyTexture) && enemyTexture === selectedEnemyTexture;
+  const enemySprite = scene.add.image(VIEWPORT.width / 2, illustratedEnemy ? 446 : 320, enemyTexture).setDepth(3);
+  const rarityScale = enemy.rarity === 'elite' ? 1.2 : 1;
+  const enemyWidth = isBoss ? 205 : illustratedEnemy && selectedEnemyTexture.endsWith('ratkin_group') ? 204 : 154;
+  const enemyHeight = isBoss ? 252 : illustratedEnemy ? 208 : 205;
+  const fitScale = Math.min(enemyWidth / enemySprite.width, enemyHeight / enemySprite.height) * rarityScale;
+  enemySprite.setScale(fitScale);
+  if (illustratedEnemy) enemySprite.setOrigin(0.5, 1);
+  const enemyVisualCenterY = illustratedEnemy ? enemySprite.y - enemySprite.displayHeight / 2 : 320;
+  enemySprite.setData('baseTint', null);
   if (enemy.burning) {
-    const flameAura = scene.add.ellipse(VIEWPORT.width / 2, 307, 122, 222, 0xff6b22, 0.1)
+    const flameAura = scene.add.ellipse(VIEWPORT.width / 2, enemyVisualCenterY, 122, 222, 0xff6b22, 0.1)
       .setStrokeStyle(2, 0xff9138, 0.6).setDepth(2);
     scene.tweens.add({ targets: flameAura, alpha: 0.24, scaleX: 1.06, scaleY: 1.03, duration: 420, yoyo: true, repeat: -1 });
   }
-
-  const isBoss = run.rooms[run.roomIndex]?.event === 'boss';
-  const selectedEnemyTexture = enemyTextureKey(enemy, isBoss);
-  const fallbackEnemyTexture = isBoss ? 'enemy-boss'
-    : enemy.name.includes('Esqueleto') ? 'enemy-skeleton'
-    : enemy.name.includes('Slime') ? 'enemy-slime' : 'enemy-goblin';
-  const enemyTexture = scene.textures.exists(selectedEnemyTexture) ? selectedEnemyTexture : fallbackEnemyTexture;
-  const enemyWidth = isBoss ? 205 : 154;
-  const enemyHeight = isBoss ? 252 : 205;
-  const enemySprite = scene.add.image(VIEWPORT.width / 2, 320, enemyTexture).setDepth(3);
-  const rarityScale = enemy.rarity === 'elite' ? 1.2 : 1;
-  const fitScale = Math.min(enemyWidth / enemySprite.width, enemyHeight / enemySprite.height) * rarityScale;
-  enemySprite.setScale(fitScale);
-  enemySprite.setData('baseTint', null);
   if (enemy.rarity === 'uncommon') {
     ensureLightParticleTexture(scene);
-    scene.add.particles(VIEWPORT.width / 2, 320, 'uncommon-light-particle', {
+    scene.add.particles(VIEWPORT.width / 2, enemyVisualCenterY, 'uncommon-light-particle', {
       lifespan: { min: 360, max: 760 },
       frequency: 105,
       quantity: 1,
@@ -164,18 +192,20 @@ export function renderCombatScreen(
   drawBar(scene, 139, 601, 142, 19, player.mp / Math.max(1, player.maxMp), C.blue,
     `MANA ${formatMana(player.mp)}/${formatMana(player.maxMp)}`, 10);
   const playerStatuses: StatusHudEntry[] = [
-    ...(player.burning ? [{ texture: STATUS_TEXTURES.burning, label: `FOGO ${player.burning.turnsRemaining}` }] : []),
-    ...(player.poisoned ? [{ texture: STATUS_TEXTURES.poisoned, label: `VENENO ${player.poisoned.turnsRemaining}` }] : []),
-    ...(player.healingOverTime ? [{ texture: STATUS_TEXTURES.healingOverTime, label: `CURA ${player.healingOverTime.turnsRemaining}` }] : []),
-    ...(player.magicShield ? [{ texture: STATUS_TEXTURES.magicShield, label: 'MÁG.' }] : []),
-    ...(run.defending ? [{ texture: STATUS_TEXTURES.physicalDefense, label: 'DEF.' }] : []),
+    ...(player.burning ? [{ texture: STATUS_TEXTURES.burning, label: `FOGO ${player.burning.turnsRemaining}T` }] : []),
+    ...(player.poisoned ? [{ texture: STATUS_TEXTURES.poisoned, label: `VENENO ${player.poisoned.turnsRemaining}T` }] : []),
+    ...(player.healingOverTime ? [{ texture: STATUS_TEXTURES.healingOverTime, label: `CURA ${player.healingOverTime.turnsRemaining}T` }] : []),
+    ...(player.magicShield && player.magicShieldHitsRemaining !== undefined && player.magicShieldHitsRemaining > 0
+      ? [{ texture: STATUS_TEXTURES.magicShield, label: `ESCUDO ${player.magicShieldHitsRemaining} GOLPES` }] : []),
+    ...(player.guardBroken ? [{ texture: STATUS_TEXTURES.physicalDefense, label: 'GUARDA QUEBRADA', tint: 0xff7770, color: '#ffb5a8' }] : []),
+    ...(run.defending ? [{ texture: STATUS_TEXTURES.physicalDefense, label: 'DEFESA 1 ATAQUE' }] : []),
   ];
-  drawStatusHud(scene, playerStatuses, 622, 10, 10);
+  const playerStatusRows = drawStatusHud(scene, playerStatuses, 622, 10, 10);
   const extraActor = run.turnScheduler?.activeExtra;
   const turnStatus = extraActor === 'player' ? 'TURNO EXTRA DO JOGADOR'
     : extraActor === 'enemy' ? 'TURNO EXTRA DO INIMIGO'
     : busy ? 'O inimigo prepara-se…' : run.playerTurn ? 'Seu turno' : 'Turno do inimigo…';
-  addText(scene, VIEWPORT.width / 2, 650, turnStatus, 9, C.muted);
+  addText(scene, VIEWPORT.width / 2, 653 + Math.max(0, playerStatusRows - 1) * 20, turnStatus, 9, C.muted);
 
   const leftAction = run.classId === 'mage'
     ? { label: 'MAGIA', action: actions.onMagic }
@@ -413,28 +443,35 @@ export function renderEntityInfoScreen(
     `HP ${entity.hp}/${entity.maxHp}     MANA ${formatMana(entity.mp)}/${formatMana(entity.maxMp)}`, 12).setDepth(22);
   if (isPlayer) addText(scene, VIEWPORT.width / 2, 248, `XP ${run.xp}/${RULES.xpToNextLevel(entity.level)}`, 12, C.muted).setDepth(22);
   const activeEffects = [
-    entity.burning ? `QUEIMANDO • ${entity.burning.turnsRemaining} turno(s)` : '',
-    entity.poisoned ? `ENVENENADO • ${entity.poisoned.turnsRemaining} turno(s)` : '',
-    entity.healingOverTime ? `REGENERAÇÃO • ${entity.healingOverTime.turnsRemaining} turno(s)` : '',
+    entity.burning ? `FOGO ${entity.burning.turnsRemaining}T` : '',
+    entity.poisoned ? `VENENO ${entity.poisoned.turnsRemaining}T` : '',
+    entity.healingOverTime ? `CURA ${entity.healingOverTime.turnsRemaining}T` : '',
+    entity.magicShield && (entity.magicShieldHitsRemaining ?? 0) > 0
+      ? `ESCUDO ${entity.magicShieldHitsRemaining} GOLPES` : '',
+    entity.guardBroken ? 'GUARDA QUEBRADA' : '',
+    isPlayer && run.defending ? 'DEFENDENDO' : '',
   ].filter(Boolean);
-  if (activeEffects.length) addText(scene, VIEWPORT.width / 2, isPlayer ? 270 : 248,
-    activeEffects.join('  |  '), 11, entity.burning ? '#ff9a52' : '#91e0a1').setDepth(22);
-  addText(scene, VIEWPORT.width / 2, 289, 'ATRIBUTOS', 13, C.muted).setDepth(22);
+  const effectsLabel = activeEffects.length ? `EFEITOS: ${activeEffects.join(' • ')}` : 'EFEITOS: nenhum';
+  const effectsColor = entity.burning ? '#ff9a52' : entity.guardBroken ? '#ffb5a8'
+    : entity.magicShield ? '#91d9ff' : '#91e0a1';
+  addText(scene, VIEWPORT.width / 2, isPlayer ? 270 : 248, effectsLabel, 11, effectsColor)
+    .setWordWrapWidth(310).setDepth(22);
+  addText(scene, VIEWPORT.width / 2, 305, 'ATRIBUTOS', 13, C.muted).setDepth(22);
   ATTRIBUTES.forEach((attribute, index) => {
     const col = index % 2, row = Math.floor(index / 2);
-    addText(scene, 112 + col * 170, 319 + row * 33, `${ATTRIBUTE_LABELS[attribute]}   ${entity.stats[attribute]}`, 14).setDepth(22);
+    addText(scene, 112 + col * 170, 335 + row * 33, `${ATTRIBUTE_LABELS[attribute]}   ${entity.stats[attribute]}`, 14).setDepth(22);
   });
   const physical = DERIVED_FORMULAS.physicalDamage(entity.stats, entity.level);
   const magical = DERIVED_FORMULAS.magicDamage(entity.stats, entity.level);
-  addText(scene, VIEWPORT.width / 2, 430, 'STATUS E VALORES DERIVADOS', 12, C.muted).setDepth(22);
-  addText(scene, VIEWPORT.width / 2, 458, `Dano físico ${physical.min}–${physical.max}   •   mágico ${magical.min}–${magical.max}`, 11).setDepth(22);
-  addText(scene, VIEWPORT.width / 2, 485, `Esquiva ${DERIVED_FORMULAS.evasionPercent(entity.stats)}%   •   crítico ${criticalChance(entity)}%`, 11).setDepth(22);
+  addText(scene, VIEWPORT.width / 2, 446, 'STATUS E VALORES DERIVADOS', 12, C.muted).setDepth(22);
+  addText(scene, VIEWPORT.width / 2, 474, `Dano físico ${physical.min}–${physical.max}   •   mágico ${magical.min}–${magical.max}`, 11).setDepth(22);
+  addText(scene, VIEWPORT.width / 2, 501, `Esquiva ${DERIVED_FORMULAS.evasionPercent(entity.stats)}%   •   crítico ${criticalChance(entity)}%`, 11).setDepth(22);
   const lowHealthWarrior = entity.specialization === 'knight' && entity.hp < entity.maxHp * 0.5;
   const vitalityNote = lowHealthWarrior ? ` • VIT efetiva ${effectiveVitality(entity)}` : '';
-  addText(scene, VIEWPORT.width / 2, 512,
+  addText(scene, VIEWPORT.width / 2, 528,
     `Redução de dano ${defenseValue(entity, 'physical').toFixed(1)}%${vitalityNote}`, 11).setDepth(22);
-  addText(scene, VIEWPORT.width / 2, 539, `Velocidade ${DERIVED_FORMULAS.extraTurnSpeed(entity.stats)}   •   mutação ${entity.mutated ? 'ativa' : 'não'}`, 11).setDepth(22);
-  if (entity.specialization) addText(scene, VIEWPORT.width / 2, 565,
+  addText(scene, VIEWPORT.width / 2, 555, `Velocidade ${DERIVED_FORMULAS.extraTurnSpeed(entity.stats)}   •   mutação ${entity.mutated ? 'ativa' : 'não'}`, 11).setDepth(22);
+  if (entity.specialization) addText(scene, VIEWPORT.width / 2, 581,
     `${SPECIALIZATIONS[entity.specialization].name} • ${entity.level < RULES.classSkillUnlockLevel
       ? `habilidade no nível ${RULES.classSkillUnlockLevel}`
       : `Habilidade: ${entity.classSkill ? CLASS_SKILLS[entity.classSkill].name : '—'}`}`, 10, C.paper).setDepth(22);
@@ -461,14 +498,14 @@ export function renderMagicListScreen(
       false, run.player.mp >= RULES.fireArrowManaCost);
     scene.add.image(80, 306, SPELL_CONTENT.fireArrow.texture).setDisplaySize(48, 48).setDepth(24);
     addText(scene, VIEWPORT.width / 2, 346,
-      `Dano mágico integral • ${Math.round(RULES.fireArrowBurnChance * 100)}% de queimar`, 10).setDepth(22);
+      `${Math.round(RULES.fireArrowDamageMultiplier * 100)}% do dano mágico • ${Math.round(RULES.fireArrowBurnChance * 100)}% de queimar`, 10).setDepth(22);
     addText(scene, VIEWPORT.width / 2, 365,
-      `Queima ${Math.round(RULES.burnDamageMultiplier * 100)}% do dano • até ${RULES.burnDurationTurns} ativações`, 10, C.muted).setDepth(22);
+      `Queimadura: ${Math.round(RULES.burnDamageMultiplier * 100)}% do Míssil • máx. ${RULES.burnDurationTurns} turnos`, 10, C.muted).setDepth(22);
     addButton(scene, isBusy, VIEWPORT.width / 2, 420, 270, 50,
       `${SPELL_CONTENT.magicShield.name.toUpperCase()} • ${RULES.magicShieldManaCost} MP`, onCastMagicShield,
       '#29251d', 23, false, run.player.mp >= RULES.magicShieldManaCost && !run.player.magicShield);
     addText(scene, VIEWPORT.width / 2, 460,
-      'Reduz em 50% o próximo dano recebido.', 10, C.muted).setDepth(22);
+      'Reduz em 50% os próximos 2 ataques acertados.', 10, C.muted).setDepth(22);
     if (run.player.classSkill && run.player.level >= RULES.classSkillUnlockLevel) {
       const skill = CLASS_SKILLS[run.player.classSkill];
       const skillUsable = !classSkillIsSupport(run.player.classSkill)

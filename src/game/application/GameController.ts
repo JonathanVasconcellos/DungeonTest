@@ -79,9 +79,11 @@ export class GameController {
     if (!run?.enemy || !run.playerTurn || run.classId !== 'mage' || run.player.magicShield) return transition('combat');
     if (run.player.mp < RULES.magicShieldManaCost) return transition('combat', { note: 'Mana insuficiente para Escudo Mágico.' });
     const before = captureRunLogSnapshot(run);
+    run.defending = false;
     run.player.mp -= RULES.magicShieldManaCost;
     run.player.magicShield = true;
-    this.pushCombatMessages([`Escudo Mágico: custo ${RULES.magicShieldManaCost} MP; reduzirá em 50% o próximo dano recebido.`], before);
+    run.player.magicShieldHitsRemaining = 2;
+    this.pushCombatMessages([`Escudo Mágico: custo ${RULES.magicShieldManaCost} MP; reduzirá em 50% os próximos 2 ataques acertados.`], before);
     recordCombatAction(run, 'player', 'Defesa: Escudo Mágico', before);
     this.cancelPreparedEnemyAbility();
     return this.advanceAfterTurnAction('player', 'defend');
@@ -115,6 +117,7 @@ export class GameController {
     const before = captureRunLogSnapshot(run);
     run.player.mp -= skill.manaCost;
     if (classSkillIsSupport(skillId)) {
+      if (skill.effect === 'aegis') run.defending = false;
       const messages = resolveClassSkillSupport(run.player, skillId);
       this.pushCombatMessages(messages, before);
       recordCombatAction(run, 'player', `Habilidade: ${skill.name}`, before);
@@ -150,7 +153,8 @@ export class GameController {
     if (!this.run || this.run.classId === 'mage' || !this.run.enemy || !this.run.playerTurn) return transition('combat');
     const before = captureRunLogSnapshot(this.run);
     if (!prepareDefense(this.run)) return transition('combat');
-    this.pushCombatMessages(['Ação do jogador: Defender; o dano será dividido por 2 após a resistência passiva no próximo turno inimigo.'], before);
+    const manaRestored = this.run.player.mp - before.playerMp;
+    this.pushCombatMessages([`Ação do jogador: Defender; o dano será dividido por 2 após a resistência passiva no próximo turno inimigo; +${manaRestored} MP.`], before);
     recordCombatAction(this.run, 'player', 'Defender', before);
     return this.advanceAfterTurnAction('player', 'defend');
   }

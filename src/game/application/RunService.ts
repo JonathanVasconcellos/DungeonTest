@@ -52,12 +52,14 @@ export function clearCombatEffects(run: RunState): void {
   const affected = new Set(entities.filter((entity): entity is NonNullable<typeof entity> => entity !== undefined));
   let cleared = false;
   for (const entity of affected) {
-    if (entity.burning || entity.poisoned || entity.healingOverTime || entity.magicShield) cleared = true;
+    if (entity.burning || entity.poisoned || entity.healingOverTime || entity.magicShield || entity.guardBroken) cleared = true;
     delete entity.burning;
     delete entity.poisoned;
     delete entity.healingOverTime;
     delete entity.magicShield;
     delete entity.magicShieldReduction;
+    delete entity.magicShieldHitsRemaining;
+    delete entity.guardBroken;
   }
   run.defending = false;
   if (cleared) appendRunLog(run, 'Efeitos temporários encerrados ao fim do combate.');
@@ -81,7 +83,8 @@ export function enterRoom(run: RunState): RoomEntryKind {
     run.enemy = room.enemy;
     run.enemyIntent = chooseEnemyIntent(room.enemy, run.player);
     beginCombatLog(run, room.enemy.name);
-    appendRunLog(run, `Intenção inicial: ${run.enemyIntent}; chance de habilidade ${Math.round(enemyAbilityChance(room.enemy, run.player) * 100)}%.`);
+    const forcedBasicAttack = room.enemy.rarity === 'normal' && room.enemy.abilityUsedLastTurn === true;
+    appendRunLog(run, `Intenção inicial: ${run.enemyIntent}; ${forcedBasicAttack ? 'ataque básico obrigatório / chance de habilidade 0%' : `chance de habilidade ${Math.round(enemyAbilityChance(room.enemy, run.player) * 100)}%`}.`);
   } else {
     run.enemy = undefined;
     run.enemyIntent = undefined;
@@ -140,6 +143,8 @@ export function allocatePendingPoint(run: RunState, attribute: Attribute): boole
   if (run.pendingPoints === 0) {
     run.player.maxHp = DERIVED_FORMULAS.maxHp(next, run.player.level);
     run.player.maxMp = DERIVED_FORMULAS.maxMp(next, run.player.level);
+    run.player.hp = run.player.maxHp;
+    run.player.mp = run.player.maxMp;
     run.pendingEventNote = `Nível ${run.player.level}! ${run.pendingEventNote ?? 'Evento concluído.'}`;
     return true;
   }

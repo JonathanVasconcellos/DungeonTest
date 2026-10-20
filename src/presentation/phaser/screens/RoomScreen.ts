@@ -34,6 +34,12 @@ export function renderRoomScreen(
       addChestGlint(scene, VIEWPORT.width / 2, 402);
     } else {
       ensurePixelEffectTexture(scene);
+      const bonfireParticleZone: Phaser.Types.GameObjects.Particles.RandomZoneSource = {
+        getRandomPoint: (point) => {
+          point.x = Phaser.Math.Between(-13, 13);
+          point.y = Phaser.Math.Between(-8, 8);
+        },
+      };
       scene.add.particles(VIEWPORT.width / 2, 390, 'ui-pixel-effect', {
         frequency: 460,
         quantity: 1,
@@ -44,7 +50,7 @@ export function renderRoomScreen(
         scale: { start: 0.9, end: 0.1 },
         alpha: { start: 0.7, end: 0 },
         tint: [0xffb742, 0xffe2a1],
-        emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(-13, -8, 26, 16) },
+        emitZone: { type: 'random', source: bonfireParticleZone },
       }).setDepth(5);
     }
     const prompt = note || (event === 'chest' ? 'TOQUE PARA ABRIR' : 'TOQUE PARA DESCANSAR');
