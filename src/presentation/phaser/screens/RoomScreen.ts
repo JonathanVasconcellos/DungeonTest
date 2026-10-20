@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { RunState } from '../../../game/types';
-import { addButton, addPanel, addText, drawSewerBackground, ensurePixelEffectTexture, PALETTE as C, VIEWPORT } from '../SceneUi';
+import { addButton, addPanel, addText, bindUIAction, drawSewerBackground, ensurePixelEffectTexture, holdSceneInput,
+  invalidateSceneActions, isSceneInputGenerationCurrent, sceneInputGeneration, PALETTE as C, VIEWPORT } from '../SceneUi';
 
 export function renderRoomScreen(
   scene: Phaser.Scene,
@@ -16,6 +17,7 @@ export function renderRoomScreen(
   const { background } = drawSewerBackground(scene);
   addText(scene, 96, 29, `ANDAR ${run.dungeonLevel}`, 12, C.paper);
   addText(scene, 263, 29, `SALA ${run.roomIndex + 1}`, 12, C.paper);
+  if (showCompletionPopup) invalidateSceneActions(scene);
   addButton(scene, () => false, 377, 36, 38, 30, 'LOG', onShowLog, '#29251d', 15);
   const event = run.rooms[run.roomIndex]?.event;
   const eventTexture = event === 'chest' ? 'event-treasure-chest'
@@ -25,7 +27,7 @@ export function renderRoomScreen(
     const sprite = scene.add.image(VIEWPORT.width / 2, 407, eventTexture)
       .setDisplaySize(event === 'chest' ? 104 : 94, event === 'chest' ? 76 : 92).setDepth(4)
       .setInteractive({ useHandCursor: true });
-    sprite.on('pointerdown', onInteract);
+    bindUIAction(scene, sprite, onInteract);
     const eventScaleX = sprite.scaleX;
     const eventScaleY = sprite.scaleY;
     scene.tweens.add({ targets: sprite, scaleX: eventScaleX * 1.04, scaleY: eventScaleY * 1.04,
@@ -72,11 +74,12 @@ export function renderRoomScreen(
     const arrowScaleX = arrow.scaleX;
     const arrowScaleY = arrow.scaleY;
     let advancing = false;
-    arrow.on('pointerdown', () => {
+    bindUIAction(scene, arrow, () => {
       if (advancing) return;
       advancing = true;
-      scene.input.enabled = false;
       arrow.disableInteractive();
+      const releaseTransitionLock = holdSceneInput(scene);
+      const generation = sceneInputGeneration(scene);
       scene.tweens.add({
         targets: arrow,
         y: 248,
@@ -98,7 +101,11 @@ export function renderRoomScreen(
             duration: 520,
             ease: 'Sine.In',
             onComplete: () => {
-              scene.cameras.main.once('camerafadeoutcomplete', onAdvance);
+              if (!isSceneInputGenerationCurrent(scene, generation)) { releaseTransitionLock(); return; }
+              scene.cameras.main.once('camerafadeoutcomplete', () => {
+                if (isSceneInputGenerationCurrent(scene, generation)) onAdvance();
+                releaseTransitionLock();
+              });
               scene.cameras.main.fadeOut(170, 0, 0, 0);
             },
           });

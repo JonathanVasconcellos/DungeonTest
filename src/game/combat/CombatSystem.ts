@@ -70,7 +70,8 @@ export function resolvePlayerAttack(run: RunState): CombatResult {
   if (dodged) return { ...result('continue', `Ataque básico esquivado (chance de esquiva do inimigo: ${evasionChance}%).`), actionConsumed: true,
     visual: { kind: 'dodge', target: 'enemy', attackType: range.type } };
 
-  const rawDamage = modifyAttackDamage(run.player, randomDamage(range.min, range.max), range.type);
+  const baseRoll = randomDamage(range.min, range.max);
+  const rawDamage = modifyAttackDamage(run.player, baseRoll, range.type);
   const critical = randomChance(criticalChance(run.player));
   const criticalDamage = rawDamage * (critical ? RULES.criticalMultiplier : 1);
   const defense = defenseValue(enemy, range.type);
@@ -87,7 +88,7 @@ export function resolvePlayerAttack(run: RunState): CombatResult {
   const visual: CombatVisualCue = { kind: 'hit', target: 'enemy', amount: damage, critical, attackType: range.type };
   const manaNote = manaRestored ? ` +${formatMana(manaRestored)} MP` : '';
   const damageLabel = range.type === 'magical' ? 'mágico' : 'físico';
-  const details = `Ataque básico ${damageLabel}: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (chance ${criticalChance(run.player)}%), resistência ${guardBroken ? 'ignorada por Guarda Quebrada' : `${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})`}, redução aplicada ${Math.max(0, criticalDamage - damage)}, dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`;
+  const details = `Ataque básico ${damageLabel}: sorteio base inteiro ${baseRoll} (faixa ${range.min}–${range.max}), dano após bônus ${rawDamage}, crítico ${critical ? `sim (×${RULES.criticalMultiplier})` : 'não'} (chance ${criticalChance(run.player)}%), resistência ${guardBroken ? 'ignorada por Guarda Quebrada' : `${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})`}, dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`;
   if (enemy.hp <= 0) return { ...result('enemy-defeated', details, `Você derrotou ${enemy.name} com ${damage} de dano${critical ? ' crítico' : ''}.${manaNote}`), actionConsumed: true, visual };
   return { ...result('continue', details, `Você causou ${damage} de dano${critical ? ' crítico' : ''}.${manaNote}`), actionConsumed: true, visual };
 }
@@ -130,8 +131,9 @@ export function resolvePlayerDoubleAttack(run: RunState): CombatResult {
       details.push(`Golpe ${strike + 1}: esquivado (chance ${evasionChance}%).`);
       continue;
     }
-    const rawDamage = modifyAttackDamage(run.player,
-      Math.floor(randomDamage(range.min, range.max) * RULES.doubleAttackDamageMultiplier), range.type);
+    const baseRoll = randomDamage(range.min, range.max);
+    const multipliedRoll = Math.floor(baseRoll * RULES.doubleAttackDamageMultiplier);
+    const rawDamage = modifyAttackDamage(run.player, multipliedRoll, range.type);
     const critical = randomChance(criticalChance(run.player));
     criticalHit ||= critical;
     const defense = defenseValue(enemy, range.type);
@@ -143,8 +145,7 @@ export function resolvePlayerDoubleAttack(run: RunState): CombatResult {
     total += damage;
     hits += 1;
     hitDetails.push({ amount: damage, critical });
-    const criticalDamage = rawDamage * (critical ? RULES.criticalMultiplier : 1);
-    details.push(`Golpe ${strike + 1}: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(run.player)}%), resistência ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality}), redução ${Math.max(0, criticalDamage - damage)}, final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`);
+    details.push(`Golpe ${strike + 1}: sorteio base inteiro ${baseRoll} (faixa ${range.min}–${range.max}) × ${RULES.doubleAttackDamageMultiplier}, arredondado para baixo = ${multipliedRoll}; dano após bônus ${rawDamage}; crítico ${critical ? `sim (×${RULES.criticalMultiplier})` : 'não'} (chance ${criticalChance(run.player)}%); resistência ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality}); dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`);
   }
 
   const visual: CombatVisualCue = hits > 0
@@ -168,8 +169,8 @@ export function resolvePlayerFireArrow(run: RunState): CombatResult {
   if (hit.dodged) return { ...result('continue', `Míssil de Fogo: custo ${RULES.fireArrowManaCost} MP; esquivado (chance de esquiva ${hit.evasionChance}%).`), actionConsumed: true,
     visual: { kind: 'dodge', target: 'enemy', attackType: 'magical' } };
   const visual: CombatVisualCue = { kind: 'hit', target: 'enemy', amount: hit.damage, critical: hit.critical, attackType: 'magical' };
-  const fireCriticalDamage = hit.rawDamage * (hit.critical ? RULES.criticalMultiplier : 1);
-  const details = `Míssil de Fogo: custo ${RULES.fireArrowManaCost} MP. Cálculo mágico: base inteira ${hit.baseDamage} × ${RULES.fireArrowDamageMultiplier} = bruto ${hit.rawDamage}; crítico ${hit.critical ? 'sim' : 'não'} (${hit.criticalChance}%); resistência ${hit.defense.toFixed(1)}% (VIT efetiva do alvo ${effectiveVitality(enemy)}); redução aplicada ${Math.max(0, fireCriticalDamage - hit.damage)}; dano final ${hit.damage}.`;
+  const damageAfterMultiplier = Math.floor(hit.baseDamage * RULES.fireArrowDamageMultiplier);
+  const details = `Míssil de Fogo: custo ${RULES.fireArrowManaCost} MP. Base mágica inteira ${hit.baseDamage} × ${RULES.fireArrowDamageMultiplier}, arredondada para baixo = ${damageAfterMultiplier}; dano após bônus de especialização ${hit.rawDamage}; crítico ${hit.critical ? `sim (×${RULES.criticalMultiplier})` : 'não'} (${hit.criticalChance}%); resistência ${hit.defense.toFixed(1)}% (VIT efetiva do alvo ${effectiveVitality(enemy)}); dano final ${hit.damage}.`;
   if (hit.target.hp <= 0) return { ...result('enemy-defeated', details, `Míssil de Fogo derrotou ${hit.target.name} (${hit.damage} dano).`), actionConsumed: true, visual };
   return { ...result('continue', details, `${hit.critical ? 'Crítico! ' : ''}Míssil causou ${hit.damage}${hit.burnApplied ? ` e aplicou queimadura (${Math.max(1, Math.floor(hit.damage * RULES.burnDamageMultiplier))} por ativação, até ${RULES.burnDurationTurns}).` : ' de dano.'}`), actionConsumed: true, visual };
 }
@@ -273,8 +274,9 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       const evasionChance = DERIVED_FORMULAS.evasionPercent(player.stats);
       if (randomChance(evasionChance)) { evadedHits += 1; details.push(`Golpe inimigo ${strike + 1} esquivado (chance ${evasionChance}%).`); continue; }
       const range = basicAttackRange(enemy, 'rogue');
-      const rawDamage = modifyAttackDamage(enemy,
-        Math.floor(randomDamage(range.min, range.max) * RULES.doubleAttackDamageMultiplier), range.type);
+      const baseRoll = randomDamage(range.min, range.max);
+      const multipliedRoll = Math.floor(baseRoll * RULES.doubleAttackDamageMultiplier);
+      const rawDamage = modifyAttackDamage(enemy, multipliedRoll, range.type);
       const critical = randomChance(criticalChance(enemy));
       criticalHit ||= critical;
       const defense = defenseValue(player, range.type);
@@ -288,8 +290,7 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       hits += 1;
       total += damage;
       hitDetails.push({ amount: damage, critical });
-      const criticalDamage = rawDamage * (critical ? RULES.criticalMultiplier : 1);
-      details.push(`Golpe inimigo ${strike + 1}: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(enemy)}%), resistência passiva ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}, redução total ${Math.max(0, criticalDamage - damage)}, final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`);
+      details.push(`Golpe inimigo ${strike + 1}: sorteio base inteiro ${baseRoll} (faixa ${range.min}–${range.max}) × ${RULES.doubleAttackDamageMultiplier}, arredondado para baixo = ${multipliedRoll}; dano após bônus ${rawDamage}; crítico ${critical ? `sim (×${RULES.criticalMultiplier})` : 'não'} (chance ${criticalChance(enemy)}%); resistência passiva ${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}; dano final ${damage}.${poisonNote ? ` ${poisonNote}` : ''}`);
     }
     visual = hits > 0
       ? { kind: 'hit', target: 'player', amount: total, critical: criticalHit, attackType: 'double', evadedHits, hitDetails }
@@ -305,7 +306,7 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       : { kind: 'hit', target: 'player', amount: hit.damage, critical: hit.critical, attackType: 'magical' };
     messages.push(hit.dodged
       ? `Você esquivou do Míssil de Fogo inimigo (chance ${hit.evasionChance}%).`
-      : `Míssil inimigo: base inteira sorteada ${hit.baseDamage} × ${RULES.fireArrowDamageMultiplier} = ${hit.rawDamage}, crítico ${hit.critical ? 'sim' : 'não'} (${hit.criticalChance}%), resistência passiva ${hit.defense.toFixed(1)}% (VIT efetiva do alvo ${effectiveVitality(player)})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; Escudo Mágico divide por 2' : ''}; redução total ${Math.max(0, hit.rawDamage * (hit.critical ? RULES.criticalMultiplier : 1) - hit.damage)}; dano ${hit.damage}${hit.burnApplied ? '; queimadura aplicada.' : '.'}`);
+      : `Míssil inimigo: base mágica inteira ${hit.baseDamage} × ${RULES.fireArrowDamageMultiplier}, arredondada para baixo = ${Math.floor(hit.baseDamage * RULES.fireArrowDamageMultiplier)}; dano após bônus de especialização ${hit.rawDamage}; crítico ${hit.critical ? `sim (×${RULES.criticalMultiplier})` : 'não'} (${hit.criticalChance}%); resistência passiva ${hit.defense.toFixed(1)}% (VIT efetiva do alvo ${effectiveVitality(player)})${defending ? '; Defender divide por 2 após resistência' : ''}${shielded ? '; Escudo Mágico divide por 2' : ''}; dano final ${hit.damage}${hit.burnApplied ? '; queimadura aplicada.' : '.'}`);
   } else {
     const evasionChance = DERIVED_FORMULAS.evasionPercent(player.stats);
     const dodged = randomChance(evasionChance);
@@ -315,7 +316,8 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       if (defending) messages.push('A defesa expirou após o turno inimigo.');
     } else {
       const range = basicAttackRange(enemy, enemy.classId ?? 'warrior');
-      const rawDamage = modifyAttackDamage(enemy, randomDamage(range.min, range.max), range.type);
+      const baseRoll = randomDamage(range.min, range.max);
+      const rawDamage = modifyAttackDamage(enemy, baseRoll, range.type);
       const critical = randomChance(criticalChance(enemy));
       const criticalDamage = rawDamage * (critical ? RULES.criticalMultiplier : 1);
       const defense = defenseValue(player, range.type);
@@ -330,7 +332,7 @@ export function resolveEnemyTurn(run: RunState): CombatResult {
       const manaRestored = regenerateManaOnBasicAttackHit(enemy, critical);
       visual = { kind: 'hit', target: 'player', amount: damage, critical, attackType: range.type };
       const damageLabel = range.type === 'magical' ? 'mágico' : 'físico';
-      messages.push(`Cálculo do ataque básico ${damageLabel} inimigo: faixa ${range.min}–${range.max}, sorteio inteiro ${rawDamage}, dano bruto ${criticalDamage}, crítico ${critical ? 'sim' : 'não'} (${criticalChance(enemy)}%), resistência passiva ${guardBroken ? 'ignorada por Guarda Quebrada' : `${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})`}${defending ? '; Defender divide após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}, redução total ${Math.max(0, criticalDamage - damage)}, dano ${damage}${manaRestored ? `, +${formatMana(manaRestored)} MP` : ''}.${poisonNote ? ` ${poisonNote}` : ''}`);
+      messages.push(`Cálculo do ataque básico ${damageLabel} inimigo: sorteio base inteiro ${baseRoll} (faixa ${range.min}–${range.max}), dano após bônus ${rawDamage}, crítico ${critical ? `sim (×${RULES.criticalMultiplier})` : 'não'} (chance ${criticalChance(enemy)}%), resistência passiva ${guardBroken ? 'ignorada por Guarda Quebrada' : `${defense.toFixed(1)}% (VIT efetiva do alvo ${targetVitality})`}${defending ? '; Defender divide após resistência' : ''}${shielded ? '; escudo reduz dano' : ''}; dano final ${damage}${manaRestored ? `, +${formatMana(manaRestored)} MP` : ''}.${poisonNote ? ` ${poisonNote}` : ''}`);
     }
   }
   }

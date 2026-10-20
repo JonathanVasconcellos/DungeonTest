@@ -6,14 +6,142 @@ export const PALETTE = {
   red: '#9d352d', green: '#4c8a54', blue: '#477b9c',
 } as const;
 
+interface SceneInputGate {
+  generation: number;
+  gestureLocked: boolean;
+  pointerDown: boolean;
+  pointerId: number;
+  actionPending: boolean;
+  dispatching: boolean;
+  heldLocks: Set<number>;
+  nextLockId: number;
+}
+
+const inputGates = new WeakMap<Phaser.Scene, SceneInputGate>();
+
+function inputGate(scene: Phaser.Scene): SceneInputGate {
+  let gate = inputGates.get(scene);
+  if (gate) return gate;
+  gate = { generation: 0, gestureLocked: false, pointerDown: false, pointerId: -1,
+    actionPending: false, dispatching: false, heldLocks: new Set<number>(), nextLockId: 1 };
+  inputGates.set(scene, gate);
+  scene.input.topOnly = true;
+  const releasePointer = (pointer: Phaser.Input.Pointer): void => {
+    if (!gate!.gestureLocked || pointer.id !== gate!.pointerId) return;
+    gate!.pointerDown = false;
+    releaseGateIfReady(gate!);
+  };
+  scene.input.on('pointerup', releasePointer);
+  scene.input.on('pointerupoutside', releasePointer);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    gate!.generation += 1;
+    gate!.gestureLocked = false;
+    gate!.actionPending = false;
+    gate!.heldLocks.clear();
+  });
+  return gate;
+}
+
+function releaseGateIfReady(gate: SceneInputGate): void {
+  if (!gate.pointerDown && !gate.actionPending && gate.heldLocks.size === 0) gate.gestureLocked = false;
+}
+
+export function sceneInputGeneration(scene: Phaser.Scene): number {
+  return inputGate(scene).generation;
+}
+
+export function isSceneInputGenerationCurrent(scene: Phaser.Scene, generation: number): boolean {
+  return inputGate(scene).generation === generation;
+}
+
+/** Keeps input locked across an asynchronous visual transition. */
+export function holdSceneInput(scene: Phaser.Scene): () => void {
+  const gate = inputGate(scene);
+  const lockId = gate.nextLockId++;
+  gate.heldLocks.add(lockId);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    gate.heldLocks.delete(lockId);
+    releaseGateIfReady(gate);
+  };
+}
+
+/** Binds a single accepted pointer gesture to an action, ignoring stale/hidden controls and click-through. */
+export function bindUIAction(
+  scene: Phaser.Scene,
+  object: Phaser.GameObjects.GameObject,
+  action: () => void,
+  enabled: () => boolean = () => true,
+  beforeAction?: (complete: () => void) => void,
+): void {
+  const gate = inputGate(scene);
+  const generation = gate.generation;
+  object.setData('uiInputGeneration', generation);
+  object.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    if (gate.gestureLocked || gate.heldLocks.size > 0 || !enabled() || !object.active
+      || !scene.sys.isActive() || object.getData('uiInputGeneration') !== gate.generation) return;
+    gate.gestureLocked = true;
+    gate.pointerDown = true;
+    gate.pointerId = pointer.id;
+    gate.actionPending = true;
+    const complete = (): void => {
+      if (!gate.actionPending) return;
+      const visibility = object as Phaser.GameObjects.GameObject & { visible?: boolean };
+      if (generation !== gate.generation || !object.active || visibility.visible === false) {
+        gate.actionPending = false;
+        releaseGateIfReady(gate);
+        return;
+      }
+      gate.dispatching = true;
+      try { action(); }
+      finally {
+        gate.dispatching = false;
+        gate.actionPending = false;
+        releaseGateIfReady(gate);
+      }
+    };
+    try {
+      if (beforeAction) beforeAction(complete);
+      else complete();
+    } catch (error) {
+      gate.actionPending = false;
+      releaseGateIfReady(gate);
+      throw error;
+    }
+  });
+}
+
 export function clearScene(scene: Phaser.Scene): void {
+  const gate = inputGate(scene);
+  gate.generation += 1;
+  if (gate.actionPending && !gate.dispatching) gate.actionPending = false;
+  gate.heldLocks.clear();
+  releaseGateIfReady(gate);
   scene.tweens.killAll();
-  scene.input.enabled = false;
-  // Remova as áreas de clique antes de destruir os objetos para evitar hitboxes
-  // órfãs ao trocar de tela durante a atualização do InputPlugin do Phaser.
-  scene.children.list.forEach((child) => child.disableInteractive());
+  disableSceneTreeInput(scene);
   scene.children.removeAll(true);
-  scene.input.enabled = true;
+}
+
+/** Invalidates current controls while keeping their visuals, for modal screens and transitions. */
+export function invalidateSceneActions(scene: Phaser.Scene): number {
+  const gate = inputGate(scene);
+  gate.generation += 1;
+  if (gate.actionPending && !gate.dispatching) gate.actionPending = false;
+  disableSceneTreeInput(scene);
+  releaseGateIfReady(gate);
+  return gate.generation;
+}
+
+function disableSceneTreeInput(scene: Phaser.Scene): void {
+  // Containers own their children, so invalidate hit areas throughout the full tree.
+  const disableTree = (child: Phaser.GameObjects.GameObject): void => {
+    const interactive = child as Phaser.GameObjects.GameObject & { disableInteractive?: () => void; list?: Phaser.GameObjects.GameObject[] };
+    interactive.disableInteractive?.();
+    interactive.list?.forEach(disableTree);
+  };
+  scene.children.list.forEach(disableTree);
 }
 
 const PANEL_BODY_DATA_KEY = 'panelBody';
@@ -95,19 +223,12 @@ export function addButton(
   const panel = addPanel(scene, x, y, width, height, color).setDepth(depth);
   const bg = panel.getData(PANEL_BODY_DATA_KEY) as Phaser.GameObjects.Rectangle;
   const caption = addText(scene, x, y - 9, label, 17).setDepth(depth + 1);
-  if (!enabled) { panel.setAlpha(0.5); caption.setAlpha(0.5); return; }
-  let activationPending = false;
+  const canActivate = (): boolean => enabled && (allowWhileBusy || !isBusy());
+  if (!canActivate()) { panel.setAlpha(0.5); caption.setAlpha(0.5); return; }
   bg.setInteractive({ useHandCursor: true });
-  bg.on('pointerdown', () => {
-    if (activationPending || (!allowWhileBusy && isBusy())) return;
-    activationPending = true;
-    bg.disableInteractive();
-    scene.input.enabled = false;
+  bindUIAction(scene, bg, action, canActivate, (complete) => {
     scene.tweens.add({ targets: [panel, caption], scaleX: 0.96, scaleY: 0.96,
-      duration: 65, yoyo: true, ease: 'Sine.Out', onComplete: () => {
-        scene.input.enabled = true;
-        action();
-      } });
+      duration: 65, yoyo: true, ease: 'Sine.Out', onComplete: complete });
   });
   bg.on('pointerover', () => {
     scene.tweens.add({ targets: [panel, caption], scaleX: 1.025, scaleY: 1.025, duration: 90, ease: 'Sine.Out' });

@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import type { RunState } from '../../../game/types';
-import { addButton, addText, PALETTE as C, VIEWPORT } from '../SceneUi';
+import { addButton, addText, isSceneInputGenerationCurrent, sceneInputGeneration, PALETTE as C, VIEWPORT } from '../SceneUi';
 import { formatRunLogEntry } from '../../../game/state/runLog';
 
 export function renderRunLogScreen(scene: Phaser.Scene, run: RunState, onClose: () => void): void {
+  const generation = sceneInputGeneration(scene);
   scene.add.rectangle(VIEWPORT.width / 2, VIEWPORT.height / 2, VIEWPORT.width, VIEWPORT.height, 0x080807, 0.72)
     .setInteractive().setDepth(30);
   scene.add.rectangle(VIEWPORT.width / 2, VIEWPORT.height / 2, 370, 690, 0xd1c49b)
@@ -77,14 +78,16 @@ export function renderRunLogScreen(scene: Phaser.Scene, run: RunState, onClose: 
   const scrollZone = scene.add.zone(view.x + (view.width - 12) / 2, view.y + view.height / 2, view.width - 12, view.height)
     .setInteractive().setDepth(34);
   scrollZone.on('wheel', (_pointer: Phaser.Input.Pointer, _over: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
+    if (!isSceneInputGenerationCurrent(scene, generation)) return;
     applyScroll(scroll + dy * 0.8);
   });
   scrollZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    if (!isSceneInputGenerationCurrent(scene, generation)) return;
     dragStartY = pointer.y;
     dragStartScroll = scroll;
   });
   scrollZone.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-    if (pointer.isDown) applyScroll(dragStartScroll + dragStartY - pointer.y);
+    if (pointer.isDown && isSceneInputGenerationCurrent(scene, generation)) applyScroll(dragStartScroll + dragStartY - pointer.y);
   });
   scrollZone.on('pointerup', () => { dragStartY = 0; });
   renderWindow();
@@ -97,8 +100,8 @@ export function renderRunLogScreen(scene: Phaser.Scene, run: RunState, onClose: 
       return;
     }
     void navigator.clipboard.writeText(exportText)
-      .then(() => copyStatus.setText('Log copiado para a área de transferência.'))
-      .catch(() => copyStatus.setText('Não foi possível copiar; tente novamente no navegador.'));
+      .then(() => { if (isSceneInputGenerationCurrent(scene, generation) && copyStatus.active) copyStatus.setText('Log copiado para a área de transferência.'); })
+      .catch(() => { if (isSceneInputGenerationCurrent(scene, generation) && copyStatus.active) copyStatus.setText('Não foi possível copiar; tente novamente no navegador.'); });
   }, '#29251d', 36, true);
   addButton(scene, () => false, 295, 721, 166, 40, 'VOLTAR AO JOGO', onClose, '#29251d', 36, true);
 }

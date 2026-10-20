@@ -12,7 +12,7 @@ import { criticalChance, defenseValue, effectiveVitality, formatMana } from '../
 import { SPECIALIZATIONS } from '../../../game/content/specializations';
 import type { ClassId, EnemyIntent, Entity, RunState } from '../../../game/types';
 import { CLASS_SKILL_TEXTURES, enemyTextureKey, fallbackEnemyTextureKey, isIllustratedEnemyTexture, STATUS_TEXTURES } from '../GameAssets';
-import { addButton, addPanel, addText, drawBar, drawSewerBackground, showManpu, PALETTE as C, VIEWPORT } from '../SceneUi';
+import { addButton, addPanel, addText, bindUIAction, drawBar, drawSewerBackground, showManpu, PALETTE as C, VIEWPORT } from '../SceneUi';
 
 export type CombatAnimation = 'player-attack' | 'heavy-attack' | 'double-attack' | 'fire' | 'enemy-attack' | 'defend' | 'none'
   | 'heavy-prepare' | 'double-prepare' | 'fire-prepare' | 'enemy-dodge' | 'player-dodge';
@@ -95,7 +95,7 @@ export function renderCombatScreen(
   if (!run.enemy) return;
   drawSewerBackground(scene);
   addText(scene, 96, 29, `ANDAR ${run.dungeonLevel}`, 12, C.paper);
-  addButton(scene, actions.isBusy, 377, 36, 38, 30, 'LOG', actions.onShowLog, '#29251d', 15);
+  addButton(scene, actions.isBusy, 377, 36, 38, 30, 'LOG', actions.onShowLog, '#29251d', 15, false, !busy);
 
   const enemy = run.enemy;
   addText(scene, 263, 29, `SALA ${run.roomIndex + 1}/${RULES.roomsPerLevel}`, 12, C.paper);
@@ -156,8 +156,10 @@ export function renderCombatScreen(
       blendMode: Phaser.BlendModes.ADD,
     }).setDepth(4);
   }
-  enemySprite.setInteractive(scene.input.makePixelPerfect(1))
-    .on('pointerdown', () => { if (!actions.isBusy()) actions.onShowInfo(enemy, 'INIMIGO'); });
+  if (!busy) {
+    enemySprite.setInteractive(scene.input.makePixelPerfect(1));
+    bindUIAction(scene, enemySprite, () => actions.onShowInfo(enemy, 'INIMIGO'), () => !actions.isBusy());
+  }
 
   const player = run.player;
   const playerTexture: Record<ClassId, string> = {
@@ -166,25 +168,28 @@ export function renderCombatScreen(
   const weaponPositionX: Record<ClassId, number> = { warrior: 300, rogue: 265, mage: 220 };
   const weaponSprite = scene.add.image(weaponPositionX[run.classId], 460, playerTexture[run.classId])
     .setDisplaySize(440, 440).setDepth(5);
-  weaponSprite.setInteractive(scene.input.makePixelPerfect(1))
-    .on('pointerdown', () => { if (!actions.isBusy()) actions.onShowInfo(player, 'JOGADOR'); });
+  if (!busy) {
+    weaponSprite.setInteractive(scene.input.makePixelPerfect(1));
+    bindUIAction(scene, weaponSprite, () => actions.onShowInfo(player, 'JOGADOR'), () => !actions.isBusy());
+  }
   const leftPropTexture = run.classId === 'mage' ? 'pov-mage-grimoire' : 'pov-defense-shield';
   const leftPropSprite = scene.add.image(52, 566, leftPropTexture).setDisplaySize(194, 194).setDepth(7);
 
   const playerTitle = addText(scene, VIEWPORT.width / 2, 462,
     `${player.name} Nv ${player.level} • XP ${run.xp}/${RULES.xpToNextLevel(player.level)}`, 10, C.paper);
-  playerTitle.setInteractive({ useHandCursor: true })
-    .on('pointerdown', () => { if (!actions.isBusy()) actions.onShowInfo(player, 'JOGADOR'); });
+  if (!busy) {
+    playerTitle.setInteractive({ useHandCursor: true });
+    bindUIAction(scene, playerTitle, () => actions.onShowInfo(player, 'JOGADOR'), () => !actions.isBusy());
+  }
 
   run.inventory.forEach((item, slot) => {
     const x = 168 + slot * 42;
     scene.add.circle(x, 518, 18, 0x171713).setStrokeStyle(2, 0x9d8a61).setDepth(9);
     if (!item) return;
     const itemSprite = scene.add.image(x, 518, ITEM_CONTENT[item].texture).setDisplaySize(29, 29).setDepth(11);
-    if (item === HEALING_POTION_ID && player.hp < player.maxHp) {
-      itemSprite.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-        if (!actions.isBusy()) actions.onUsePotion(slot);
-      });
+    if (!busy && item === HEALING_POTION_ID && player.hp < player.maxHp) {
+      itemSprite.setInteractive({ useHandCursor: true });
+      bindUIAction(scene, itemSprite, () => actions.onUsePotion(slot), () => !actions.isBusy());
     }
   });
 
@@ -210,13 +215,13 @@ export function renderCombatScreen(
   const leftAction = run.classId === 'mage'
     ? { label: 'MAGIA', action: actions.onMagic }
     : { label: 'DEFENDER', action: actions.onDefend };
-  addButton(scene, actions.isBusy, 72, 710, 112, 42, leftAction.label, leftAction.action, '#29251d', 12);
+  addButton(scene, actions.isBusy, 72, 710, 112, 42, leftAction.label, leftAction.action, '#29251d', 12, false, !busy);
   if (run.classId !== 'mage') {
     const skillCost = run.classId === 'warrior' ? RULES.heavyAttackManaCost : RULES.doubleAttackManaCost;
     addButton(scene, actions.isBusy, VIEWPORT.width / 2, 710, 112, 42, 'HABILIDADE', actions.onAbility,
-      '#29251d', 12, false, run.player.mp >= skillCost);
+      '#29251d', 12, false, !busy && run.player.mp >= skillCost);
   }
-  addButton(scene, actions.isBusy, 348, 710, 112, 42, 'ATACAR', actions.onAttack, '#29251d', 12);
+  addButton(scene, actions.isBusy, 348, 710, 112, 42, 'ATACAR', actions.onAttack, '#29251d', 12, false, !busy);
 
   const visibleAnimation = animation === 'none' && run.playerTurn ? animationForIntent(run.enemyIntent) : animation;
   if (visibleAnimation !== 'none' || visual) {
